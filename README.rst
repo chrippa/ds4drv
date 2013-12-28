@@ -27,14 +27,18 @@ Features
 Installing
 ----------
 
-Check out the source from Github and install it with:
+Make sure you have the dependencies:
+
+- Python 2.7 (3.3 will not be supported until python-uinput supports it)
+- python-setuptools
+- hcitool (usually available in the *bluez-utils* or equivalent package)
+
+
+Then check out the source from Github and install it with:
 
 .. code-block:: bash
 
     $ sudo python setup.py install
-
-You also need to make sure you have *hcitool* installed (usually the *bluez-utils*
-package or equivalent).
 
 
 Using
@@ -80,7 +84,6 @@ Known issues/limitations
 - No pairing, you must start your controller in pairing mode everytime
 - The controller will never be shut off, you need to do this manually by holding
   the PS button until the controller shuts off
-
 
 References
 ----------
