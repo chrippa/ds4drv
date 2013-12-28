@@ -1,9 +1,10 @@
-=================================================
-ds4drv - A DualShock 4 bluetooth driver for Linux
-=================================================
+======
+ds4drv
+======
 
-This is a simple daemon that scans for DualShock 4 controllers, connects
-to them and creates a joypad device.
+ds4drv is a simple daemon that scans for DualShock 4 controllers via bluetooth,
+connects to them and creates a joypad device. This driver does **NOT** work
+via USB.
 
 
 Background
