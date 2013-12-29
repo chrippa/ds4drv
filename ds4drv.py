@@ -532,6 +532,8 @@ def find_devices():
             device = find_device()
             if device:
                 yield device
+        except socket.error as err:
+            Daemon.warn("Unable to connect to detected device: {0}", err)
         except subprocess.CalledProcessError:
             Daemon.exit("'hcitool scan' returned error. Make sure your "
                         "bluetooth device is on with 'hciconfig hciX up'.")
