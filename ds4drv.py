@@ -495,10 +495,21 @@ controllopt.add_argument("--next-controller", nargs=0, action=ControllerAction,
                          help="creates another controller")
 
 
+def bluetooth_check():
+    try:
+        subprocess.check_output(["hcitool", "clock"], stderr=subprocess.STDOUT)
+    except subprocess.CalledProcessError:
+        Daemon.exit("'hcitool clock' returned error. Make sure your "
+                    "bluetooth device is on with 'hciconfig hciX up'.")
+    except OSError:
+        Daemon.exit("'hcitool' could not be found, make sure you have "
+                    "bluez-utils installed.")
+
 
 def bluetooth_scan():
     devices = []
-    res = subprocess.check_output(["hcitool", "scan"]).splitlines()[1:]
+    res = subprocess.check_output(["hcitool", "scan"], stderr=subprocess.STDOUT)
+    res = res.splitlines()[1:]
 
     for _, bdaddr, name in map(lambda l: l.split(b"\t"), res):
         devices.append((bdaddr, name))
@@ -559,6 +570,8 @@ def read_device(device, joypad, options):
 
 def main():
     options = parser.parse_args(sys.argv[1:] + ["--next-controller"])
+
+    bluetooth_check()
 
     if options.daemon:
         Daemon.fork(DAEMON_LOG_FILE)
