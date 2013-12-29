@@ -18,7 +18,7 @@ awesome controller until it's supported properly in bluez. :-)
 Features
 --------
 
-- Emulate the Xbox 360 controller for compability with Steam games
+- Emulate the Xbox 360 controller for compatibility with Steam games
 - Set the LED color
 - Remind you about low battery by flashing the LED
 - Use the trackpad as a mouse
