@@ -180,15 +180,15 @@ class UInputDevice(object):
 
     def create_joypad_ds4(self):
         axes_map = {
-            "ABS_X":  "left_analog_x",
-            "ABS_Y":  "left_analog_y",
-            "ABS_RX": "right_analog_x",
-            "ABS_RY": "right_analog_y",
-            "ABS_Z":  "l2_analog",
-            "ABS_RZ": "r2_analog",
+            "ABS_X":      "left_analog_x",
+            "ABS_Y":      "left_analog_y",
+            "ABS_Z":      "right_analog_x",
+            "ABS_RZ":     "right_analog_y",
+            "ABS_RX":     "l2_analog",
+            "ABS_RY":     "r2_analog",
             "ABS_TILT_X": "motion_x",
             "ABS_TILT_Y": "motion_y",
-            "ABS_WHEEL": "motion_z"
+            "ABS_WHEEL":  "motion_z"
         }
         axes_options = {
             "ABS_TILT_X": (-32767, 32767, 0, 0),
@@ -196,17 +196,20 @@ class UInputDevice(object):
             "ABS_WHEEL":  (-32767, 32767, 0, 0),
         }
         button_map = {
-            "BTN_START":  "button_options",
+            "BTN_TR2":    "button_options",
             "BTN_MODE":   "button_ps",
-            "BTN_SELECT": "button_share",
-            "BTN_A":      "button_cross",
-            "BTN_B":      "button_circle",
-            "BTN_X":      "button_square",
-            "BTN_Y":      "button_triangle",
-            "BTN_TL":     "button_l1",
-            "BTN_TR":     "button_r1",
-            "BTN_THUMBL": "button_l3",
-            "BTN_THUMBR": "button_r3"
+            "BTN_TL2":    "button_share",
+            "BTN_B":      "button_cross",
+            "BTN_C":      "button_circle",
+            "BTN_A":      "button_square",
+            "BTN_X":      "button_triangle",
+            "BTN_Y":      "button_l1",
+            "BTN_Z":      "button_r1",
+            "BTN_TL":     "button_l2",
+            "BTN_TR":     "button_r2",
+            "BTN_SELECT": "button_l3",
+            "BTN_START":  "button_r3",
+            "BTN_THUMBL": "button_trackpad"
         }
         hat_map = {
             "ABS_HAT0X": ("dpad_left", "dpad_right"),
