@@ -82,8 +82,6 @@ Known issues/limitations
 ------------------------
 
 - No pairing, you must start your controller in pairing mode everytime
-- The controller will never be shut off, you need to do this manually by holding
-  the PS button until the controller shuts off
 
 References
 ----------

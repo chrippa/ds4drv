@@ -324,6 +324,10 @@ class DS4Device(object):
 
         self.control(led_red=255, led_green=255, led_blue=255)
 
+    def close(self):
+        self.ctl_sock.close()
+        self.int_sock.close()
+
     def control(self, big_rumble=0, small_rumble=0,
                 led_red=0, led_green=0, led_blue=0,
                 flash_led1=0, flash_led2=0):
@@ -434,7 +438,8 @@ class DS4Device(object):
 
 
 class ControllerAction(argparse.Action):
-    __options__ = ["battery_flash", "emulate_xpad", "led", "trackpad_mouse"]
+    __options__ = ["battery_flash", "emulate_xpad", "idle_timeout", "led",
+                   "trackpad_mouse"]
 
     @classmethod
     def default_controller(cls):
@@ -488,6 +493,11 @@ controllopt.add_argument("--battery-flash", action="store_true",
 controllopt.add_argument("--emulate-xpad", action="store_true",
                          help="emulates the same joypad layout as a wired "
                               "Xbox 360 controller")
+controllopt.add_argument("--idle-timeout", type=int, metavar="minutes",
+                         default=15,
+                         help="disconnects the controller if no button has "
+                              "been pressed for <minutes>. 0 means no "
+                              "idle timeout at all, default is 15 minutes")
 controllopt.add_argument("--led", metavar="color", default="0000ff",
                          type=hexcolor,
                          help="sets color of the LED. Uses hex color codes, "
@@ -552,6 +562,7 @@ def read_device(device, joypad, options):
 
     led_last_flash = time()
     led_flashing = True
+    last_button_pressed = time()
     for report in device.reports:
         if options.battery_flash:
             if report.battery < 2 and not report.charging:
@@ -570,8 +581,19 @@ def read_device(device, joypad, options):
                                led_blue=options.led[2])
                 led_flashing = False
 
+        if options.idle_timeout:
+            for field in report._fields:
+                if field.startswith("button_") or field.startswith("dpad_"):
+                    if getattr(report, field):
+                        last_button_pressed = time()
+
+            if ((time() - last_button_pressed) / 60) > options.idle_timeout:
+                Daemon.info("Disconnecting controller due to idle timeout")
+                break
+
         joypad.emit(report)
 
+    device.close()
 
 def main():
     options = parser.parse_args(sys.argv[1:] + ["--next-controller"])
