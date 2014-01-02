@@ -533,7 +533,7 @@ def bluetooth_scan():
     res = res.splitlines()[1:]
 
     for _, bdaddr, name in map(lambda l: l.split(b"\t"), res):
-        devices.append((bdaddr, name))
+        devices.append((bdaddr.decode("ascii"), name.decode("ascii")))
 
     return devices
 
