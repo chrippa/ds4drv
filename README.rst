@@ -29,7 +29,7 @@ Installing
 
 Make sure you have the dependencies:
 
-- Python 2.7 (3.3 will not be supported until python-uinput supports it)
+- Python 2.7 or 3.3
 - python-setuptools
 - hcitool (usually available in the *bluez-utils* or equivalent package)
 
@@ -44,7 +44,7 @@ Then check out the source from Github and install it with:
 Using
 -----
 
-Simplest usage is to simply run it without any options:
+Simplest usage is to run it without any options:
 
 .. code-block:: bash
 

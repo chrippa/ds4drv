@@ -6,12 +6,13 @@ import subprocess
 import socket
 import sys
 
-import uinput
-
 from collections import namedtuple
 from time import time
 from threading import Thread, Lock
 from struct import Struct
+
+from evdev import UInput, ecodes
+
 
 DAEMON_LOG_FILE = "~/.cache/ds4drv.log"
 
@@ -157,30 +158,31 @@ class UInputDevice(object):
             self.create_mouse()
 
     def create_mouse(self):
-        events = (uinput.REL_X, uinput.REL_Y,
-                  uinput.BTN_LEFT, uinput.BTN_RIGHT)
-        self.mouse = uinput.Device(events)
+        events = {
+            ecodes.EV_REL: (ecodes.REL_X, ecodes.REL_Y),
+            ecodes.EV_KEY: (ecodes.BTN_LEFT, ecodes.BTN_RIGHT)
+        }
+        self.mouse = UInput(events)
         self.mouse_pos = None
 
     def create_joypad(self, name, axes, buttons, hats, axes_options={}):
-        events = []
+        events = {ecodes.EV_ABS: [], ecodes.EV_KEY: []}
         device_name = name
 
         for name in axes:
-            key = getattr(uinput, name)
+            key = getattr(ecodes, name)
             params = axes_options.get(name, (0, 255, 0, 0))
-            events.append(key + params)
-
-        for name in buttons:
-            events.append(getattr(uinput, name))
+            events[ecodes.EV_ABS].append((key, params))
 
         for name in hats:
-            key = getattr(uinput, name)
+            key = getattr(ecodes, name)
             params = (-1, 1, 0, 0)
-            events.append(key + params)
+            events[ecodes.EV_ABS].append((key, params))
 
-        self.joypad = uinput.Device(name=device_name, events=events)
+        for name in buttons:
+            events[ecodes.EV_KEY].append(getattr(ecodes, name))
 
+        self.joypad = UInput(name=device_name, events=events)
         self.axes = axes
         self.buttons = buttons
         self.hats = hats
@@ -265,18 +267,18 @@ class UInputDevice(object):
 
     def emit_joypad(self, report):
         for name, attr in self.axes.items():
-            name = getattr(uinput, name)
+            name = getattr(ecodes, name)
             value = getattr(report, attr)
 
-            self.joypad.emit(name, value, syn=False)
+            self.joypad.write(ecodes.EV_ABS, name, value)
 
         for name, attr in self.buttons.items():
-            name = getattr(uinput, name)
+            name = getattr(ecodes, name)
             value = getattr(report, attr)
-            self.joypad.emit(name, value, syn=False)
+            self.joypad.write(ecodes.EV_KEY, name, value)
 
         for name, attr in self.hats.items():
-            name = getattr(uinput, name)
+            name = getattr(ecodes, name)
             if getattr(report, attr[0]):
                 value = -1
             elif getattr(report, attr[1]):
@@ -284,7 +286,7 @@ class UInputDevice(object):
             else:
                 value = 0
 
-            self.joypad.emit(name, value, syn=False)
+            self.joypad.write(ecodes.EV_ABS, name, value)
 
         self.joypad.syn()
 
@@ -298,14 +300,15 @@ class UInputDevice(object):
             rel_x = (report.trackpad_touch0_x - self.mouse_pos[0]) * sensitivity
             rel_y = (report.trackpad_touch0_y - self.mouse_pos[1]) * sensitivity
 
-            self.mouse.emit(uinput.REL_X, int(rel_x), syn=False)
-            self.mouse.emit(uinput.REL_Y, int(rel_y))
-
+            self.mouse.write(ecodes.EV_REL, ecodes.REL_X, int(rel_x))
+            self.mouse.write(ecodes.EV_REL, ecodes.REL_Y, int(rel_y))
             self.mouse_pos = (report.trackpad_touch0_x, report.trackpad_touch0_y)
         else:
             self.mouse_pos = None
 
-        self.mouse.emit(uinput.BTN_LEFT, int(report.button_trackpad))
+        self.mouse.write(ecodes.EV_KEY, ecodes.BTN_LEFT,
+                         int(report.button_trackpad))
+        self.mouse.syn()
 
 
 class DS4Device(object):

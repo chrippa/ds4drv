@@ -12,6 +12,6 @@ setup(name="ds4drv",
           "console_scripts": ["ds4drv=ds4drv:main"]
       },
       py_modules=["ds4drv"],
-      install_requires=["python-uinput>=0.10"],
+      install_requires=["evdev"],
 )
 
