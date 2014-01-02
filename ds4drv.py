@@ -117,7 +117,14 @@ class Daemon(object):
 
     @classmethod
     def msg(cls, prefix, fmt, *args, **kwargs):
-        msg = "[{0}] ".format(prefix) + fmt.format(*args, **kwargs)
+        subprefix = kwargs.pop("subprefix", None)
+
+        if subprefix:
+            msg = "[{0}][{1}] ".format(prefix, subprefix)
+        else:
+            msg = "[{0}] ".format(prefix)
+
+        msg += fmt.format(*args, **kwargs)
 
         with cls.lock:
             cls.output.write(msg + "\n")
@@ -434,7 +441,8 @@ class DS4Device(object):
             if report:
                 yield report
             else:
-                Daemon.warn("Got simplified HID report, ignoring")
+                Daemon.warn("Got simplified HID report, ignoring",
+                            subprefix=self.bdaddr)
 
 
 class ControllerAction(argparse.Action):
@@ -534,12 +542,13 @@ def find_device():
     devices = bluetooth_scan()
     for bdaddr, name in devices:
         if name == "Wireless Controller":
+            Daemon.info("Connecting...", subprefix=bdaddr)
             return DS4Device.connect(bdaddr)
 
 
 def find_devices():
     while True:
-        Daemon.info("Looking for controllers")
+        Daemon.info("Scanning...")
 
         try:
             device = find_device()
@@ -588,11 +597,13 @@ def read_device(device, joypad, options):
                         last_button_pressed = time()
 
             if ((time() - last_button_pressed) / 60) > options.idle_timeout:
-                Daemon.info("Disconnecting controller due to idle timeout")
+                Daemon.info("Disconnecting due to idle timeout",
+                            subprefix=device.bdaddr)
                 break
 
         joypad.emit(report)
 
+    Daemon.info("Disconnected", subprefix=device.bdaddr)
     device.close()
 
 def main():
@@ -619,7 +630,7 @@ def main():
                     joypads.insert(0, (thread.joypad, thread.options))
                 threads.remove(thread)
 
-        Daemon.info("Found controller: {0}", device.bdaddr)
+        Daemon.info("Connected", subprefix=device.bdaddr)
 
         # No pre-configured controller available,
         # create one with default settings
