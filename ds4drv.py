@@ -609,6 +609,7 @@ def read_device(device, joypad, options):
     Daemon.info("Disconnected", subprefix=device.bdaddr)
     device.close()
 
+
 def main():
     options = parser.parse_args(sys.argv[1:] + ["--next-controller"])
 
@@ -652,4 +653,3 @@ def main():
         thread.options = options
         thread.start()
         threads.append(thread)
-
