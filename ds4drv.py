@@ -31,7 +31,7 @@ HIDP_DATA_RTYPE_FEATURE = 0x03
 
 S16LE = Struct("<h")
 
-DS4Controller = namedtuple("DS4Controller", "id joypad options dynamic")
+DS4Controller = namedtuple("DS4Controller", "id joystick options dynamic")
 
 DS4Report = namedtuple("DS4Report",
                        ["left_analog_x",
@@ -155,9 +155,9 @@ class UInputDevice(object):
         self.mouse = None
 
         if xpad:
-            self.create_joypad_xpad()
+            self.create_joystick_xpad()
         else:
-            self.create_joypad_ds4()
+            self.create_joystick_ds4()
 
         if mouse:
             self.create_mouse()
@@ -170,7 +170,7 @@ class UInputDevice(object):
         self.mouse = UInput(events)
         self.mouse_pos = None
 
-    def create_joypad(self, name, axes, buttons, hats, axes_options={}):
+    def create_joystick(self, name, axes, buttons, hats, axes_options={}):
         events = {ecodes.EV_ABS: [], ecodes.EV_KEY: []}
         device_name = name
 
@@ -187,12 +187,12 @@ class UInputDevice(object):
         for name in buttons:
             events[ecodes.EV_KEY].append(getattr(ecodes, name))
 
-        self.joypad = UInput(name=device_name, events=events)
+        self.joystick = UInput(name=device_name, events=events)
         self.axes = axes
         self.buttons = buttons
         self.hats = hats
 
-    def create_joypad_ds4(self):
+    def create_joystick_ds4(self):
         axes_map = {
             "ABS_X":      "left_analog_x",
             "ABS_Y":      "left_analog_y",
@@ -230,11 +230,11 @@ class UInputDevice(object):
             "ABS_HAT0Y": ("dpad_up", "dpad_down")
         }
 
-        self.create_joypad(axes=axes_map, axes_options=axes_options,
-                           buttons=button_map, hats=hat_map,
-                           name="Sony Computer Entertainment Wireless Controller")
+        self.create_joystick(axes=axes_map, axes_options=axes_options,
+                             buttons=button_map, hats=hat_map,
+                             name="Sony Computer Entertainment Wireless Controller")
 
-    def create_joypad_xpad(self):
+    def create_joystick_xpad(self):
         axes_map = {
             "ABS_X":  "left_analog_x",
             "ABS_Y":  "left_analog_y",
@@ -261,26 +261,26 @@ class UInputDevice(object):
             "ABS_HAT0Y": ("dpad_up", "dpad_down")
         }
 
-        self.create_joypad(axes=axes_map, buttons=button_map, hats=hat_map,
-                           name="Microsoft X-Box 360 pad")
+        self.create_joystick(axes=axes_map, buttons=button_map, hats=hat_map,
+                             name="Microsoft X-Box 360 pad")
 
     def emit(self, report):
-        self.emit_joypad(report)
+        self.emit_joystick(report)
 
         if self.mouse:
             self.emit_mouse(report)
 
-    def emit_joypad(self, report):
+    def emit_joystick(self, report):
         for name, attr in self.axes.items():
             name = getattr(ecodes, name)
             value = getattr(report, attr)
 
-            self.joypad.write(ecodes.EV_ABS, name, value)
+            self.joystick.write(ecodes.EV_ABS, name, value)
 
         for name, attr in self.buttons.items():
             name = getattr(ecodes, name)
             value = getattr(report, attr)
-            self.joypad.write(ecodes.EV_KEY, name, value)
+            self.joystick.write(ecodes.EV_KEY, name, value)
 
         for name, attr in self.hats.items():
             name = getattr(ecodes, name)
@@ -291,9 +291,9 @@ class UInputDevice(object):
             else:
                 value = 0
 
-            self.joypad.write(ecodes.EV_ABS, name, value)
+            self.joystick.write(ecodes.EV_ABS, name, value)
 
-        self.joypad.syn()
+        self.joystick.syn()
 
     def emit_mouse(self, report):
         if report.trackpad_touch0_active:
@@ -506,7 +506,7 @@ controllopt.add_argument("--battery-flash", action="store_true",
                          help="flashes the LED once a minute if the "
                               "battery is low")
 controllopt.add_argument("--emulate-xpad", action="store_true",
-                         help="emulates the same joypad layout as a wired "
+                         help="emulates the same joystick layout as a wired "
                               "Xbox 360 controller")
 controllopt.add_argument("--idle-timeout", type=int, metavar="minutes",
                          default=15,
@@ -545,7 +545,7 @@ def bluetooth_scan():
     return devices
 
 
-def next_joypad_device():
+def next_joystick_device():
     for i in range(100):
         dev = "/dev/input/js{0}".format(i)
         if not os.path.exists(dev):
@@ -553,13 +553,13 @@ def next_joypad_device():
 
 
 def create_controller(index, options, dynamic=False):
-    js_device = next_joypad_device()
-    joypad = UInputDevice(xpad=options.emulate_xpad,
-                          mouse=options.trackpad_mouse)
-    controller = DS4Controller(index, joypad, options, dynamic)
+    jsdev = next_joystick_device()
+    joystick = UInputDevice(xpad=options.emulate_xpad,
+                            mouse=options.trackpad_mouse)
+    controller = DS4Controller(index, joystick, options, dynamic)
 
-    Daemon.info("Created devices {0} (joypad) {1} (evdev)",
-                js_device, joypad.joypad.device.fn,
+    Daemon.info("Created devices {0} (joystick) {1} (evdev)",
+                jsdev, joystick.joystick.device.fn,
                 subprefix=CONTROLLER_LOG.format(controller.id))
 
     return controller
@@ -636,7 +636,7 @@ def read_device(device, controller):
                             subprefix=CONTROLLER_LOG.format(controller.id))
                 break
 
-        controller.joypad.emit(report)
+        controller.joystick.emit(report)
 
     Daemon.info("Disconnected",
                 subprefix=CONTROLLER_LOG.format(controller.id))
@@ -660,7 +660,7 @@ def main():
 
     for device in find_devices():
         for thread in threads:
-            # Reclaim the joypad device if the controller is gone
+            # Reclaim the joystick device if the controller is gone
             if not thread.is_alive():
                 if not thread.controller.dynamic:
                     controllers.insert(0, thread.controller)

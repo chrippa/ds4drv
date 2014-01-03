@@ -3,7 +3,7 @@ ds4drv
 ======
 
 ds4drv is a simple daemon that scans for DualShock 4 controllers via bluetooth,
-connects to them and creates a joypad device. This driver does **NOT** work
+connects to them and creates a joystick device. This driver does **NOT** work
 via USB.
 
 
