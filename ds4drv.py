@@ -176,7 +176,7 @@ class UInputDevice(object):
 
         for name in axes:
             key = getattr(ecodes, name)
-            params = axes_options.get(name, (0, 255, 0, 0))
+            params = axes_options.get(name, (0, 255, 0, 15))
             events[ecodes.EV_ABS].append((key, params))
 
         for name in hats:
