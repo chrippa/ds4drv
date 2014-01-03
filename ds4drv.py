@@ -14,6 +14,9 @@ from struct import Struct
 from evdev import UInput, ecodes
 
 
+CONTROLLER_LOG = "Controller {0}"
+BLUETOOTH_LOG = "Bluetooth"
+
 DAEMON_LOG_FILE = "~/.cache/ds4drv.log"
 
 L2CAP_PSM_HIDP_CTRL = 0x11
@@ -27,6 +30,8 @@ HIDP_DATA_RTYPE_OUTPUT = 0x02
 HIDP_DATA_RTYPE_FEATURE = 0x03
 
 S16LE = Struct("<h")
+
+DS4Controller = namedtuple("DS4Controller", "id joypad options dynamic")
 
 DS4Report = namedtuple("DS4Report",
                        ["left_analog_x",
@@ -335,8 +340,8 @@ class DS4Device(object):
         self.control(led_red=255, led_green=255, led_blue=255)
 
     def close(self):
-        self.ctl_sock.close()
         self.int_sock.close()
+        self.ctl_sock.close()
 
     def control(self, big_rumble=0, small_rumble=0,
                 led_red=0, led_green=0, led_blue=0,
@@ -444,8 +449,7 @@ class DS4Device(object):
             if report:
                 yield report
             else:
-                Daemon.warn("Got simplified HID report, ignoring",
-                            subprefix=self.bdaddr)
+                Daemon.warn("Got simplified HID report, ignoring")
 
 
 class ControllerAction(argparse.Action):
@@ -541,24 +545,51 @@ def bluetooth_scan():
     return devices
 
 
+def next_joypad_device():
+    for i in range(100):
+        dev = "/dev/input/js{0}".format(i)
+        if not os.path.exists(dev):
+            return dev
+
+
+def create_controller(index, options, dynamic=False):
+    js_device = next_joypad_device()
+    joypad = UInputDevice(xpad=options.emulate_xpad,
+                          mouse=options.trackpad_mouse)
+    controller = DS4Controller(index, joypad, options, dynamic)
+
+    Daemon.info("Created devices {0} (joypad) {1} (evdev)",
+                js_device, joypad.joypad.device.fn,
+                subprefix=CONTROLLER_LOG.format(controller.id))
+
+    return controller
+
+
 def find_device():
     devices = bluetooth_scan()
     for bdaddr, name in devices:
         if name == "Wireless Controller":
-            Daemon.info("Connecting...", subprefix=bdaddr)
+            Daemon.info("Found device {0}", bdaddr,
+                        subprefix=BLUETOOTH_LOG)
             return DS4Device.connect(bdaddr)
 
 
 def find_devices():
+    log_msg = True
     while True:
-        Daemon.info("Scanning...")
+        if log_msg:
+            Daemon.info("Scanning for devices", subprefix=BLUETOOTH_LOG)
 
         try:
             device = find_device()
             if device:
                 yield device
+                log_msg = True
+            else:
+                log_msg = False
         except socket.error as err:
-            Daemon.warn("Unable to connect to detected device: {0}", err)
+            Daemon.warn("Unable to connect to detected device: {0}", err,
+                        subprefix=BLUETOOTH_LOG)
         except subprocess.CalledProcessError:
             Daemon.exit("'hcitool scan' returned error. Make sure your "
                         "bluetooth device is on with 'hciconfig hciX up'.")
@@ -567,7 +598,8 @@ def find_devices():
                         "bluez-utils installed.")
 
 
-def read_device(device, joypad, options):
+def read_device(device, controller):
+    options = controller.options
     device.control(led_red=options.led[0],
                    led_green=options.led[1],
                    led_blue=options.led[2])
@@ -601,12 +633,13 @@ def read_device(device, joypad, options):
 
             if ((time() - last_button_pressed) / 60) > options.idle_timeout:
                 Daemon.info("Disconnecting due to idle timeout",
-                            subprefix=device.bdaddr)
+                            subprefix=CONTROLLER_LOG.format(controller.id))
                 break
 
-        joypad.emit(report)
+        controller.joypad.emit(report)
 
-    Daemon.info("Disconnected", subprefix=device.bdaddr)
+    Daemon.info("Disconnected",
+                subprefix=CONTROLLER_LOG.format(controller.id))
     device.close()
 
 
@@ -618,38 +651,35 @@ def main():
     if options.daemon:
         Daemon.fork(DAEMON_LOG_FILE)
 
-    joypads = []
+    controllers = []
     threads = []
 
-    for controller in options.controllers:
-        joypad = UInputDevice(xpad=controller.emulate_xpad,
-                              mouse=controller.trackpad_mouse)
-        joypads.append((joypad, controller))
+    for index, options in enumerate(options.controllers):
+        controller = create_controller(index + 1, options)
+        controllers.append(controller)
 
     for device in find_devices():
         for thread in threads:
             # Reclaim the joypad device if the controller is gone
             if not thread.is_alive():
-                if not thread.dynamic:
-                    joypads.insert(0, (thread.joypad, thread.options))
+                if not thread.controller.dynamic:
+                    controllers.insert(0, thread.controller)
                 threads.remove(thread)
-
-        Daemon.info("Connected", subprefix=device.bdaddr)
 
         # No pre-configured controller available,
         # create one with default settings
-        if not joypads:
-            joypad = UInputDevice()
+        if not controllers:
+            index = len(threads) + 1
             options = ControllerAction.default_controller()
-            dynamic = True
+            controller = create_controller(index, options, dynamic=True)
         else:
-            joypad, options = joypads.pop(0)
-            dynamic = False
+            controller = controllers.pop(0)
 
-        thread = Thread(target=read_device, args=(device, joypad, options))
+        Daemon.info("Connected to {0}", device.bdaddr,
+                    subprefix=CONTROLLER_LOG.format(controller.id))
+
+        thread = Thread(target=read_device, args=(device, controller))
         thread.daemon = True
-        thread.dynamic = dynamic
-        thread.joypad = joypad
-        thread.options = options
+        thread.controller = controller
         thread.start()
         threads.append(thread)
