@@ -545,7 +545,8 @@ def bluetooth_check():
 
 def bluetooth_scan():
     devices = []
-    res = subprocess.check_output(["hcitool", "scan"], stderr=subprocess.STDOUT)
+    res = subprocess.check_output(["hcitool", "scan", "--flush"],
+                                  stderr=subprocess.STDOUT)
     res = res.splitlines()[1:]
 
     for _, bdaddr, name in map(lambda l: l.split(b"\t"), res):
