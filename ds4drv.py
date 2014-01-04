@@ -194,20 +194,26 @@ class UInputDevice(object):
 
     def create_joystick_ds4(self):
         axes_map = {
-            "ABS_X":      "left_analog_x",
-            "ABS_Y":      "left_analog_y",
-            "ABS_Z":      "right_analog_x",
-            "ABS_RZ":     "right_analog_y",
-            "ABS_RX":     "l2_analog",
-            "ABS_RY":     "r2_analog",
-            "ABS_TILT_X": "motion_x",
-            "ABS_TILT_Y": "motion_y",
-            "ABS_WHEEL":  "motion_z"
+            "ABS_X":        "left_analog_x",
+            "ABS_Y":        "left_analog_y",
+            "ABS_Z":        "right_analog_x",
+            "ABS_RZ":       "right_analog_y",
+            "ABS_RX":       "l2_analog",
+            "ABS_RY":       "r2_analog",
+            "ABS_THROTTLE": "orientation_roll",
+            "ABS_RUDDER":   "orientation_pitch",
+            "ABS_WHEEL":    "orientation_yaw",
+            "ABS_DISTANCE": "motion_z",
+            "ABS_TILT_X":   "motion_x",
+            "ABS_TILT_Y":   "motion_y",
         }
         axes_options = {
-            "ABS_TILT_X": (-32767, 32767, 0, 0),
-            "ABS_TILT_Y": (-32767, 32767, 0, 0),
-            "ABS_WHEEL":  (-32767, 32767, 0, 0),
+            "ABS_THROTTLE": (-8191, 8191, 0, 0),
+            "ABS_RUDDER": (-8191, 8191, 0, 0),
+            "ABS_WHEEL":  (-8191, 8191, 0, 0),
+            "ABS_DISTANCE": (-32767, 32767, 0, 10),
+            "ABS_TILT_X": (-32767, 32767, 0, 10),
+            "ABS_TILT_Y":  (-32767, 32767, 0, 10),
         }
         button_map = {
             "BTN_TR2":    "button_options",
