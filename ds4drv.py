@@ -447,7 +447,10 @@ class DS4Device(object):
     @property
     def reports(self):
         while True:
-            report = self.read_report()
+            try:
+                report = self.read_report()
+            except (OSError, IOError):
+                break
 
             if report is None:
                 break
