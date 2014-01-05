@@ -77,6 +77,10 @@ You can also configure some options, this will set the LED to a bright red:
 
 See ``ds4drv --help`` for a list of all the options.
 
+
+Multiple controllers
+^^^^^^^^^^^^^^^^^^^^
+
 ds4drv does in theory support multiple controllers (I only have one
 controller myself, so this is untested). You can give each controller different
 options like this:
