@@ -232,12 +232,12 @@ class UInputDevice(object):
             "ABS_TILT_Y":   "motion_y",
         }
         axes_options = {
-            "ABS_THROTTLE": (-8191, 8191, 0, 0),
-            "ABS_RUDDER": (-8191, 8191, 0, 0),
-            "ABS_WHEEL":  (-8191, 8191, 0, 0),
-            "ABS_DISTANCE": (-32767, 32767, 0, 10),
-            "ABS_TILT_X": (-32767, 32767, 0, 10),
-            "ABS_TILT_Y":  (-32767, 32767, 0, 10),
+            "ABS_THROTTLE": (-16385, 16384, 0, 0),
+            "ABS_RUDDER":   (-16385, 16384, 0, 0),
+            "ABS_WHEEL":    (-16385, 16384, 0, 0),
+            "ABS_DISTANCE": (-32768, 32767, 0, 10),
+            "ABS_TILT_X":   (-32768, 32767, 0, 10),
+            "ABS_TILT_Y":   (-32768, 32767, 0, 10),
         }
         button_map = {
             "BTN_TR2":    "button_options",
