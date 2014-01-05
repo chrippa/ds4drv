@@ -1,6 +1,7 @@
 """ds4drv - A DualShock 4 bluetooth driver for Linux."""
 
 import argparse
+import atexit
 import os
 import subprocess
 import socket
@@ -9,6 +10,7 @@ import sys
 from collections import namedtuple
 from time import time
 from threading import Thread, Lock
+from signal import signal, SIGTERM
 from struct import Struct
 
 from evdev import UInput, ecodes
@@ -18,6 +20,7 @@ CONTROLLER_LOG = "Controller {0}"
 BLUETOOTH_LOG = "Bluetooth"
 
 DAEMON_LOG_FILE = "~/.cache/ds4drv.log"
+DAEMON_PID_FILE = "/tmp/ds4drv.pid"
 
 L2CAP_PSM_HIDP_CTRL = 0x11
 L2CAP_PSM_HIDP_INTR = 0x13
@@ -82,7 +85,11 @@ class Daemon(object):
     output = sys.stdout
 
     @classmethod
-    def fork(cls, logfile):
+    def fork(cls, logfile, pidfile):
+        if os.path.exists(pidfile):
+            cls.exit("ds4drv appears to already be running. Kill it "
+                     "or remove {0} if it's not really running.", pidfile)
+
         cls.info("Forking into background, writing log to {0}", logfile)
 
         try:
@@ -105,6 +112,23 @@ class Daemon(object):
                 sys.exit(0)
         else:
             sys.exit(0)
+
+        cls.create_pid(pidfile)
+
+    @classmethod
+    def create_pid(cls, pidfile):
+        @atexit.register
+        def remove_pid():
+            if os.path.exists(pidfile):
+                os.remove(pidfile)
+
+        signal(SIGTERM, lambda *a: sys.exit())
+
+        try:
+            with open(pidfile, "w") as fd:
+                fd.write(str(os.getpid()))
+        except OSError:
+            pass
 
     @classmethod
     def open_log(cls, logfile):
@@ -508,6 +532,10 @@ def hexcolor(color):
 parser = argparse.ArgumentParser(prog="ds4drv")
 parser.add_argument("--daemon", action="store_true",
                     help="run in the background as a daemon")
+parser.add_argument("--daemon-log", default=DAEMON_LOG_FILE, metavar="file",
+                    help="log file to create in daemon mode")
+parser.add_argument("--daemon-pid", default=DAEMON_PID_FILE, metavar="file",
+                    help="PID file to create in daemon mode")
 
 controllopt = parser.add_argument_group("controller options")
 controllopt.add_argument("--battery-flash", action="store_true",
@@ -642,7 +670,7 @@ def main():
     bluetooth_check()
 
     if options.daemon:
-        Daemon.fork(DAEMON_LOG_FILE)
+        Daemon.fork(options.daemon_log, options.daemon_pid)
 
     controllers = []
     threads = []
