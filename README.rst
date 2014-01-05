@@ -54,6 +54,17 @@ ds4drv does not support pairing, so to connect the controller you need to
 start it in pairing mode every time you want to use it. This is done by holding
 the Share and PS button until the LED starts blinking.
 
+Permissions
+^^^^^^^^^^^
+
+ds4drv uses the kernel module uinput to create input devices in user land,
+but this usually requires root permissions. You can change the permissions
+by creating a udev rule. Put this in ``/etc/udev/rules.d/50-uinput.rules``:
+
+.. code-block::
+
+    KERNEL=="uinput", MODE="0666"
+
 
 Configuring
 -----------
