@@ -93,8 +93,8 @@ Known issues/limitations
 ------------------------
 
 - No pairing, you must start your controller in pairing mode everytime
-- The controller may not always turn off on disconnect, hold the
-  PS button down to turn the controller off manually if needed
+- The controller will never be shut off, you need to do this manually by holding
+  the PS button until the controller shuts off
 
 References
 ----------
