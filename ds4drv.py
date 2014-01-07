@@ -77,7 +77,9 @@ DS4Report = namedtuple("DS4Report",
                         "trackpad_touch1_y",
                         "timestamp",
                         "battery",
-                        "charging"])
+                        "plug_usb",
+                        "plug_audio",
+                        "plug_mic"])
 
 
 class Daemon(object):
@@ -464,8 +466,11 @@ class DS4Device(object):
 
             # Timestamp and battery
             buf[10] >> 2,
-            buf[33] % 0x10,
-            (buf[33] & 0x10) != 0
+            buf[33] % 16,
+
+            # External inputs (usb, audio, mic)
+            (buf[33] & 16) != 0, (buf[33] & 32) != 0,
+            (buf[33] & 64) != 0
         )
 
     @property
@@ -640,7 +645,7 @@ def read_device(device, controller):
     led_flashing = True
     for report in device.reports:
         if options.battery_flash:
-            if report.battery < 2 and not report.charging:
+            if report.battery < 2 and not report.plug_usb:
                 if not led_flashing and (time() - led_last_flash) > 60:
                     device.control(led_red=options.led[0],
                                    led_green=options.led[1],
