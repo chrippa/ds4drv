@@ -1,5 +1,11 @@
 """ds4drv - A DualShock 4 bluetooth driver for Linux."""
 
+__title__ = "ds4drv"
+__version__ = "0.1.0"
+__author__ = "Christopher Rosell"
+__license__ = "MIT"
+
+
 import argparse
 import atexit
 import os
@@ -535,12 +541,16 @@ def hexcolor(color):
 
 
 parser = argparse.ArgumentParser(prog="ds4drv")
-parser.add_argument("--daemon", action="store_true",
-                    help="run in the background as a daemon")
-parser.add_argument("--daemon-log", default=DAEMON_LOG_FILE, metavar="file",
-                    help="log file to create in daemon mode")
-parser.add_argument("--daemon-pid", default=DAEMON_PID_FILE, metavar="file",
-                    help="PID file to create in daemon mode")
+parser.add_argument("--version", action="version",
+                    version="%(prog)s {0}".format(__version__))
+
+daemonopt = parser.add_argument_group("daemon options")
+daemonopt.add_argument("--daemon", action="store_true",
+                       help="run in the background as a daemon")
+daemonopt.add_argument("--daemon-log", default=DAEMON_LOG_FILE, metavar="file",
+                       help="log file to create in daemon mode")
+daemonopt.add_argument("--daemon-pid", default=DAEMON_PID_FILE, metavar="file",
+                       help="PID file to create in daemon mode")
 
 controllopt = parser.add_argument_group("controller options")
 controllopt.add_argument("--battery-flash", action="store_true",
