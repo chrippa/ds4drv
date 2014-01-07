@@ -33,8 +33,14 @@ Make sure you have the dependencies:
 - python-setuptools
 - hcitool (usually available in the *bluez-utils* or equivalent package)
 
+Installing the latest release via `pip <http://www.pip-installer.org/>`_:
 
-Then check out the source from Github and install it with:
+.. code-block:: bash
+
+    $ sudo pip install ds4drv
+
+or if you want to run the latest development code, check out the source
+from Github and install it with:
 
 .. code-block:: bash
 
