@@ -55,14 +55,14 @@ Make sure you have the dependencies:
 
 Installing the latest release via `pip <http://www.pip-installer.org/>`_:
 
-.. code-block:: console
+.. code-block:: bash
 
     $ sudo pip install ds4drv
 
 or if you want to run the latest development code, check out the source
 from Github and install it with:
 
-.. code-block:: console
+.. code-block:: bash
 
     $ sudo python setup.py install
 
@@ -72,7 +72,7 @@ Using
 
 Simplest usage is to run it without any options:
 
-.. code-block:: console
+.. code-block:: bash
 
    $ ds4drv
 
@@ -97,7 +97,7 @@ Configuring
 
 You can also configure some options, this will set the LED to a bright red:
 
-.. code-block:: console
+.. code-block:: bash
 
    $ ds4drv --led ff0000
 
@@ -111,7 +111,7 @@ ds4drv does in theory support multiple controllers (I only have one
 controller myself, so this is untested). You can give each controller different
 options like this:
 
-.. code-block:: console
+.. code-block:: bash
 
    $ ds4drv --led ff0000 --next-controller --led 00ff00
 
