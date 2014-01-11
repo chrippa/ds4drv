@@ -38,7 +38,7 @@ my DS4 via bluetooth for now. :-)
 Features
 --------
 
-- Emulating the Xbox 360 controller for compatibility with Steam games
+- Option to emulate the Xbox 360 controller for compatibility with Steam games
 - Setting the LED color
 - Reminding you about low battery by flashing the LED
 - Using the trackpad as a mouse
