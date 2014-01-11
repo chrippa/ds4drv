@@ -10,18 +10,38 @@ via USB.
 Background
 ----------
 
-The Linux bluetooth driver bluez is currently not compatible with the
-DS4 controller. ds4drv is just a quick hack to let me play games with this
-awesome controller until it's supported properly in bluez. :-)
+When I first got my DS4 controller I expected it work without any issues
+with Linux as it had been reported all over the internet that DS4 was a
+standard HID device and required no special drivers. This turned out not
+to be the case though, as when I attempted a standard pairing in Linux via
+bluetoothctl I only ended up with strange error messages.
+
+I tried asking for help on the
+`bluez mailing list <http://comments.gmane.org/gmane.linux.bluez.kernel/42097>`_
+but received no response. I tried to Google to find out if anyone else
+had succeed to use the DS4 via bluetooth, but found no success stories.
+I even tried to dig into the bluez code, but the error messages are very
+strange and doesn't seem to describe what is going wrong at all, so I
+didn't get anywhere there either.
+
+So I tried experimenting with connecting directly to the HID channels,
+just like the `libcwiid library <http://abstrakraft.org/cwiid/>`_ do with
+the Wiimote, and, it worked! Since I now had access to the raw HID report,
+I figured I might as well write a small driver to convert them into joystick
+events, and here it is, ds4drv!
+
+Hopefully someone will figure out what is broken in bluez and fix it so
+this hack will not be necessary, but this will at least let me play with
+my DS4 via bluetooth for now. :-)
 
 
 Features
 --------
 
-- Emulate the Xbox 360 controller for compatibility with Steam games
-- Set the LED color
-- Remind you about low battery by flashing the LED
-- Use the trackpad as a mouse
+- Emulating the Xbox 360 controller for compatibility with Steam games
+- Setting the LED color
+- Reminding you about low battery by flashing the LED
+- Using the trackpad as a mouse
 
 
 Installing
@@ -35,14 +55,14 @@ Make sure you have the dependencies:
 
 Installing the latest release via `pip <http://www.pip-installer.org/>`_:
 
-.. code-block:: bash
+.. code-block:: console
 
     $ sudo pip install ds4drv
 
 or if you want to run the latest development code, check out the source
 from Github and install it with:
 
-.. code-block:: bash
+.. code-block:: console
 
     $ sudo python setup.py install
 
@@ -52,7 +72,7 @@ Using
 
 Simplest usage is to run it without any options:
 
-.. code-block:: bash
+.. code-block:: console
 
    $ ds4drv
 
@@ -67,7 +87,7 @@ ds4drv uses the kernel module uinput to create input devices in user land,
 but this usually requires root permissions. You can change the permissions
 by creating a udev rule. Put this in ``/etc/udev/rules.d/50-uinput.rules``:
 
-.. code-block::
+::
 
     KERNEL=="uinput", MODE="0666"
 
@@ -77,7 +97,7 @@ Configuring
 
 You can also configure some options, this will set the LED to a bright red:
 
-.. code-block:: bash
+.. code-block:: console
 
    $ ds4drv --led ff0000
 
@@ -91,7 +111,7 @@ ds4drv does in theory support multiple controllers (I only have one
 controller myself, so this is untested). You can give each controller different
 options like this:
 
-.. code-block:: bash
+.. code-block:: console
 
    $ ds4drv --led ff0000 --next-controller --led 00ff00
 
