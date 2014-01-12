@@ -419,6 +419,7 @@ class DS4Device(object):
             return False
 
         buf = self.buf
+        dpad = buf[8] % 16
 
         return DS4Report(
             # Left analog stick
@@ -431,21 +432,21 @@ class DS4Device(object):
             buf[11], buf[12],
 
             # DPad up, down, left, right
-            (buf[8] in (0, 1, 7)), (buf[8] in (3, 4, 5)),
-            (buf[8] in (5, 6, 7)), (buf[8] in (1, 2, 3)),
+            (dpad in (0, 1, 7)), (dpad in (3, 4, 5)),
+            (dpad in (5, 6, 7)), (dpad in (1, 2, 3)),
 
-            # Buttons ross, circle, square, triangle
+            # Buttons cross, circle, square, triangle
             (buf[8] & 32) != 0, (buf[8] & 64) != 0,
             (buf[8] & 16) != 0, (buf[8] & 128) != 0,
 
             # L1, L2 and L3 buttons
-            (buf[9] & 0x01) != 0, (buf[9] & 0x04) != 0, (buf[9] & 0x40) != 0,
+            (buf[9] & 1) != 0, (buf[9] & 4) != 0, (buf[9] & 64) != 0,
 
             # R1, R2,and R3 buttons
-            (buf[9] & 0x02) != 0, (buf[9] & 0x08) != 0, (buf[9] & 0x80) != 0,
+            (buf[9] & 2) != 0, (buf[9] & 8) != 0, (buf[9] & 128) != 0,
 
             # Share and option buttons
-            (buf[9] & 0x10) != 0, (buf[9] & 0x20) != 0,
+            (buf[9] & 16) != 0, (buf[9] & 32) != 0,
 
             # Trackpad and PS buttons
             (buf[10] & 2) != 0, (buf[10] & 1) != 0,
