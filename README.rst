@@ -49,7 +49,7 @@ Installing
 
 Make sure you have the dependencies:
 
-- Python 2.7 or 3.3 (for Ubuntu you need to install the python2.7-dev or the python3.3-dev package)
+- Python 2.7 or 3.3 (for Debian/Ubuntu you need to install the *python2.7-dev* or the *python3.3-dev* package)
 - python-setuptools
 - hcitool (usually available in the *bluez-utils* or equivalent package)
 
