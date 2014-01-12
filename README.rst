@@ -76,7 +76,7 @@ Simplest usage is to run it without any options:
 
    $ ds4drv
 
-ds4drv does not support pairing, so to connect the controller you need to
+**Note:** ds4drv does not support pairing, so to connect the controller you need to
 start it in pairing mode every time you want to use it. This is done by holding
 the Share and PS button until the LED starts blinking.
 
@@ -90,6 +90,20 @@ by creating a udev rule. Put this in ``/etc/udev/rules.d/50-uinput.rules``:
 ::
 
     KERNEL=="uinput", MODE="0666"
+
+You may have to reload your udev rules after this with:
+
+.. code-block:: bash
+
+    $ sudo udevadm control --reload-rules
+
+This will make udev change the permissions on boot, if you want them
+to take effect immediately you can reload the uinput kernel module with:
+
+.. code-block:: bash
+
+    $ sudo rmmod uinput
+    $ sudo modprobe uinput
 
 
 Configuring
@@ -125,6 +139,7 @@ Known issues/limitations
 - No pairing, you must start your controller in pairing mode everytime
 - The controller will never be shut off, you need to do this manually by holding
   the PS button until the controller shuts off
+- No rumble support
 
 References
 ----------
