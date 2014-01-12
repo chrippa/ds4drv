@@ -96,14 +96,7 @@ You may have to reload your udev rules after this with:
 .. code-block:: bash
 
     $ sudo udevadm control --reload-rules
-
-This will make udev change the permissions on boot, if you want them
-to take effect immediately you can reload the uinput kernel module with:
-
-.. code-block:: bash
-
-    $ sudo rmmod uinput
-    $ sudo modprobe uinput
+    $ sudo udevadm trigger
 
 
 Configuring
