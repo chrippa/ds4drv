@@ -19,7 +19,7 @@ from threading import Thread, Lock
 from signal import signal, SIGTERM
 from struct import Struct
 
-from evdev import UInput, ecodes
+from evdev import UInput, UInputError, ecodes
 
 
 CONTROLLER_LOG = "Controller {0}"
@@ -601,8 +601,13 @@ def next_joystick_device():
 
 def create_controller(index, options, dynamic=False):
     jsdev = next_joystick_device()
-    joystick = UInputDevice(xpad=options.emulate_xpad,
-                            mouse=options.trackpad_mouse)
+
+    try:
+        joystick = UInputDevice(xpad=options.emulate_xpad,
+                                mouse=options.trackpad_mouse)
+    except UInputError as err:
+        Daemon.exit("Failed to create joystick device: {0}", err)
+
     controller = DS4Controller(index, joystick, options, dynamic)
 
     Daemon.info("Created devices {0} (joystick) {1} (evdev)",
