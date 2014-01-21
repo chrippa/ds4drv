@@ -32,7 +32,7 @@ events, and here it is, ds4drv!
 
 **Update (2014-01-21):** `Bluez 5.14 <http://www.bluez.org/bluez-5-14/>`_ has been
 released which contains support for the DS4. This project is therefore only useful
-if you want to access any features not supported in the Linux kernel yet, such as LED
+if you want to access any features not yet supported by the Linux kernel, such as LED
 color or trackpad mouse.
 
 
