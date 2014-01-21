@@ -30,9 +30,10 @@ the Wiimote, and, it worked! Since I now had access to the raw HID report,
 I figured I might as well write a small driver to convert them into joystick
 events, and here it is, ds4drv!
 
-Hopefully someone will figure out what is broken in bluez and fix it so
-this hack will not be necessary, but this will at least let me play with
-my DS4 via bluetooth for now. :-)
+**Update (2014-01-21):** `Bluez 5.14 <http://www.bluez.org/bluez-5-14/>`_ has been
+released which contains support for the DS4. This project is therefore only useful
+if you want to access any features not supported in the Linux kernel yet, such as LED
+color or trackpad mouse.
 
 
 Features
