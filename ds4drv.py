@@ -88,6 +88,98 @@ DS4Report = namedtuple("DS4Report",
                         "plug_mic"])
 
 
+JoystickLayout = namedtuple("JoystickLayout",
+                            "name axes axes_options buttons hats")
+
+
+JOYSTICK_LAYOUTS = {
+    "ds4": JoystickLayout(
+        "Sony Computer Entertainment Wireless Controller",
+        # Axes
+        {
+            "ABS_X":        "left_analog_x",
+            "ABS_Y":        "left_analog_y",
+            "ABS_Z":        "right_analog_x",
+            "ABS_RZ":       "right_analog_y",
+            "ABS_RX":       "l2_analog",
+            "ABS_RY":       "r2_analog",
+            "ABS_THROTTLE": "orientation_roll",
+            "ABS_RUDDER":   "orientation_pitch",
+            "ABS_WHEEL":    "orientation_yaw",
+            "ABS_DISTANCE": "motion_z",
+            "ABS_TILT_X":   "motion_x",
+            "ABS_TILT_Y":   "motion_y",
+        },
+        # Axes options
+        {
+            "ABS_THROTTLE": (-16385, 16384, 0, 0),
+            "ABS_RUDDER":   (-16385, 16384, 0, 0),
+            "ABS_WHEEL":    (-16385, 16384, 0, 0),
+            "ABS_DISTANCE": (-32768, 32767, 0, 10),
+            "ABS_TILT_X":   (-32768, 32767, 0, 10),
+            "ABS_TILT_Y":   (-32768, 32767, 0, 10),
+        },
+        # Buttons
+        {
+            "BTN_TR2":    "button_options",
+            "BTN_MODE":   "button_ps",
+            "BTN_TL2":    "button_share",
+            "BTN_B":      "button_cross",
+            "BTN_C":      "button_circle",
+            "BTN_A":      "button_square",
+            "BTN_X":      "button_triangle",
+            "BTN_Y":      "button_l1",
+            "BTN_Z":      "button_r1",
+            "BTN_TL":     "button_l2",
+            "BTN_TR":     "button_r2",
+            "BTN_SELECT": "button_l3",
+            "BTN_START":  "button_r3",
+            "BTN_THUMBL": "button_trackpad"
+        },
+        # Hats
+        {
+            "ABS_HAT0X": ("dpad_left", "dpad_right"),
+            "ABS_HAT0Y": ("dpad_up", "dpad_down")
+        }
+    ),
+
+    "xpad": JoystickLayout(
+        "Microsoft X-Box 360 pad",
+        # Axes
+        {
+            "ABS_X":  "left_analog_x",
+            "ABS_Y":  "left_analog_y",
+            "ABS_RX": "right_analog_x",
+            "ABS_RY": "right_analog_y",
+            "ABS_Z":  "l2_analog",
+            "ABS_RZ": "r2_analog"
+        },
+        # Axes settings
+        {},
+        #Buttons
+        {
+            "BTN_START":  "button_options",
+            "BTN_MODE":   "button_ps",
+            "BTN_SELECT": "button_share",
+            "BTN_A":      "button_cross",
+            "BTN_B":      "button_circle",
+            "BTN_X":      "button_square",
+            "BTN_Y":      "button_triangle",
+            "BTN_TL":     "button_l1",
+            "BTN_TR":     "button_r1",
+            "BTN_THUMBL": "button_l3",
+            "BTN_THUMBR": "button_r3"
+        },
+        # Hats
+        {
+            "ABS_HAT0X": ("dpad_left", "dpad_right"),
+            "ABS_HAT0Y": ("dpad_up", "dpad_down")
+        }
+    )
+}
+
+
+
 class Daemon(object):
     lock = Lock()
     output = sys.stdout
@@ -183,13 +275,9 @@ class Daemon(object):
 
 
 class UInputDevice(object):
-    def __init__(self, xpad=False, mouse=False):
+    def __init__(self, layout, mouse=False):
         self.mouse = None
-
-        if xpad:
-            self.create_joystick_xpad()
-        else:
-            self.create_joystick_ds4()
+        self.create_joystick(layout)
 
         if mouse:
             self.create_mouse()
@@ -202,105 +290,24 @@ class UInputDevice(object):
         self.mouse = UInput(events)
         self.mouse_pos = None
 
-    def create_joystick(self, name, axes, buttons, hats, axes_options={}):
+    def create_joystick(self, layout):
         events = {ecodes.EV_ABS: [], ecodes.EV_KEY: []}
-        device_name = name
 
-        for name in axes:
+        for name in layout.axes:
             key = getattr(ecodes, name)
-            params = axes_options.get(name, (0, 255, 0, 15))
+            params = layout.axes_options.get(name, (0, 255, 0, 15))
             events[ecodes.EV_ABS].append((key, params))
 
-        for name in hats:
+        for name in layout.hats:
             key = getattr(ecodes, name)
             params = (-1, 1, 0, 0)
             events[ecodes.EV_ABS].append((key, params))
 
-        for name in buttons:
+        for name in layout.buttons:
             events[ecodes.EV_KEY].append(getattr(ecodes, name))
 
-        self.joystick = UInput(name=device_name, events=events)
-        self.axes = axes
-        self.buttons = buttons
-        self.hats = hats
-
-    def create_joystick_ds4(self):
-        axes_map = {
-            "ABS_X":        "left_analog_x",
-            "ABS_Y":        "left_analog_y",
-            "ABS_Z":        "right_analog_x",
-            "ABS_RZ":       "right_analog_y",
-            "ABS_RX":       "l2_analog",
-            "ABS_RY":       "r2_analog",
-            "ABS_THROTTLE": "orientation_roll",
-            "ABS_RUDDER":   "orientation_pitch",
-            "ABS_WHEEL":    "orientation_yaw",
-            "ABS_DISTANCE": "motion_z",
-            "ABS_TILT_X":   "motion_x",
-            "ABS_TILT_Y":   "motion_y",
-        }
-        axes_options = {
-            "ABS_THROTTLE": (-16385, 16384, 0, 0),
-            "ABS_RUDDER":   (-16385, 16384, 0, 0),
-            "ABS_WHEEL":    (-16385, 16384, 0, 0),
-            "ABS_DISTANCE": (-32768, 32767, 0, 10),
-            "ABS_TILT_X":   (-32768, 32767, 0, 10),
-            "ABS_TILT_Y":   (-32768, 32767, 0, 10),
-        }
-        button_map = {
-            "BTN_TR2":    "button_options",
-            "BTN_MODE":   "button_ps",
-            "BTN_TL2":    "button_share",
-            "BTN_B":      "button_cross",
-            "BTN_C":      "button_circle",
-            "BTN_A":      "button_square",
-            "BTN_X":      "button_triangle",
-            "BTN_Y":      "button_l1",
-            "BTN_Z":      "button_r1",
-            "BTN_TL":     "button_l2",
-            "BTN_TR":     "button_r2",
-            "BTN_SELECT": "button_l3",
-            "BTN_START":  "button_r3",
-            "BTN_THUMBL": "button_trackpad"
-        }
-        hat_map = {
-            "ABS_HAT0X": ("dpad_left", "dpad_right"),
-            "ABS_HAT0Y": ("dpad_up", "dpad_down")
-        }
-
-        self.create_joystick(axes=axes_map, axes_options=axes_options,
-                             buttons=button_map, hats=hat_map,
-                             name="Sony Computer Entertainment Wireless Controller")
-
-    def create_joystick_xpad(self):
-        axes_map = {
-            "ABS_X":  "left_analog_x",
-            "ABS_Y":  "left_analog_y",
-            "ABS_RX": "right_analog_x",
-            "ABS_RY": "right_analog_y",
-            "ABS_Z":  "l2_analog",
-            "ABS_RZ": "r2_analog"
-        }
-        button_map = {
-            "BTN_START":  "button_options",
-            "BTN_MODE":   "button_ps",
-            "BTN_SELECT": "button_share",
-            "BTN_A":      "button_cross",
-            "BTN_B":      "button_circle",
-            "BTN_X":      "button_square",
-            "BTN_Y":      "button_triangle",
-            "BTN_TL":     "button_l1",
-            "BTN_TR":     "button_r1",
-            "BTN_THUMBL": "button_l3",
-            "BTN_THUMBR": "button_r3"
-        }
-        hat_map = {
-            "ABS_HAT0X": ("dpad_left", "dpad_right"),
-            "ABS_HAT0Y": ("dpad_up", "dpad_down")
-        }
-
-        self.create_joystick(axes=axes_map, buttons=button_map, hats=hat_map,
-                             name="Microsoft X-Box 360 pad")
+        self.joystick = UInput(name=layout.name, events=events)
+        self.layout = layout
 
     def emit(self, report):
         self.emit_joystick(report)
@@ -309,18 +316,18 @@ class UInputDevice(object):
             self.emit_mouse(report)
 
     def emit_joystick(self, report):
-        for name, attr in self.axes.items():
+        for name, attr in self.layout.axes.items():
             name = getattr(ecodes, name)
             value = getattr(report, attr)
 
             self.joystick.write(ecodes.EV_ABS, name, value)
 
-        for name, attr in self.buttons.items():
+        for name, attr in self.layout.buttons.items():
             name = getattr(ecodes, name)
             value = getattr(report, attr)
             self.joystick.write(ecodes.EV_KEY, name, value)
 
-        for name, attr in self.hats.items():
+        for name, attr in self.layout.hats.items():
             name = getattr(ecodes, name)
             if getattr(report, attr[0]):
                 value = -1
@@ -603,9 +610,13 @@ def next_joystick_device():
 def create_controller(index, options, dynamic=False):
     jsdev = next_joystick_device()
 
+    if options.emulate_xpad:
+        layout = JOYSTICK_LAYOUTS["xpad"]
+    else:
+        layout = JOYSTICK_LAYOUTS["ds4"]
+
     try:
-        joystick = UInputDevice(xpad=options.emulate_xpad,
-                                mouse=options.trackpad_mouse)
+        joystick = UInputDevice(layout, mouse=options.trackpad_mouse)
     except UInputError as err:
         Daemon.exit("Failed to create joystick device: {0}", err)
 
