@@ -143,6 +143,40 @@ JOYSTICK_LAYOUTS = {
         }
     ),
 
+    "xboxdrv": JoystickLayout(
+        "Xbox Gamepad (userspace driver)",
+        # Axes
+        {
+            "ABS_X":     "left_analog_x",
+            "ABS_Y":     "left_analog_y",
+            "ABS_RX":    "right_analog_x",
+            "ABS_RY":    "right_analog_y",
+            "ABS_BRAKE": "l2_analog",
+            "ABS_GAS":   "r2_analog"
+        },
+        # Axes settings
+        {},
+        #Buttons
+        {
+            "BTN_START":  "button_options",
+            "BTN_MODE":   "button_ps",
+            "BTN_SELECT": "button_share",
+            "BTN_A":      "button_cross",
+            "BTN_B":      "button_circle",
+            "BTN_X":      "button_square",
+            "BTN_Y":      "button_triangle",
+            "BTN_TL":     "button_l1",
+            "BTN_TR":     "button_r1",
+            "BTN_THUMBL": "button_l3",
+            "BTN_THUMBR": "button_r3"
+        },
+        # Hats
+        {
+            "ABS_HAT0X": ("dpad_left", "dpad_right"),
+            "ABS_HAT0Y": ("dpad_up", "dpad_down")
+        }
+    ),
+
     "xpad": JoystickLayout(
         "Microsoft X-Box 360 pad",
         # Axes
@@ -175,6 +209,42 @@ JOYSTICK_LAYOUTS = {
             "ABS_HAT0X": ("dpad_left", "dpad_right"),
             "ABS_HAT0Y": ("dpad_up", "dpad_down")
         }
+    ),
+
+    "xpad_wireless": JoystickLayout(
+        "Xbox 360 Wireless Receiver",
+        # Axes
+        {
+            "ABS_X":  "left_analog_x",
+            "ABS_Y":  "left_analog_y",
+            "ABS_RX": "right_analog_x",
+            "ABS_RY": "right_analog_y",
+            "ABS_Z":  "l2_analog",
+            "ABS_RZ": "r2_analog"
+        },
+        # Axes settings
+        {},
+        #Buttons
+        {
+            "BTN_START":  "button_options",
+            "BTN_MODE":   "button_ps",
+            "BTN_SELECT": "button_share",
+            "BTN_A":      "button_cross",
+            "BTN_B":      "button_circle",
+            "BTN_X":      "button_square",
+            "BTN_Y":      "button_triangle",
+            "BTN_TL":     "button_l1",
+            "BTN_TR":     "button_r1",
+            "BTN_THUMBL": "button_l3",
+            "BTN_THUMBR": "button_r3",
+
+            "BTN_TRIGGER_HAPPY1": "dpad_left",
+            "BTN_TRIGGER_HAPPY2": "dpad_right",
+            "BTN_TRIGGER_HAPPY3": "dpad_up",
+            "BTN_TRIGGER_HAPPY4": "dpad_down",
+        },
+        # Hats
+        {}
     )
 }
 
@@ -505,7 +575,8 @@ class DS4Device(object):
 
 
 class ControllerAction(argparse.Action):
-    __options__ = ["battery_flash", "emulate_xpad", "led", "trackpad_mouse"]
+    __options__ = ["battery_flash", "emulate_xboxdrv", "emulate_xpad",
+                   "emulate_xpad_wireless", "led", "trackpad_mouse"]
 
     @classmethod
     def default_controller(cls):
@@ -564,9 +635,16 @@ controllopt = parser.add_argument_group("controller options")
 controllopt.add_argument("--battery-flash", action="store_true",
                          help="flashes the LED once a minute if the "
                               "battery is low")
+controllopt.add_argument("--emulate-xboxdrv", action="store_true",
+                         help="emulates the same joystick layout as a "
+                              "Xbox 360 controller used via xboxdrv")
 controllopt.add_argument("--emulate-xpad", action="store_true",
                          help="emulates the same joystick layout as a wired "
-                              "Xbox 360 controller")
+                              "Xbox 360 controller used via the xpad module")
+controllopt.add_argument("--emulate-xpad-wireless", action="store_true",
+                         help="emulates the same joystick layout as a wireless "
+                              "Xbox 360 controller used via the xpad module")
+
 controllopt.add_argument("--led", metavar="color", default="0000ff",
                          type=hexcolor,
                          help="sets color of the LED. Uses hex color codes, "
@@ -610,10 +688,16 @@ def next_joystick_device():
 def create_controller(index, options, dynamic=False):
     jsdev = next_joystick_device()
 
-    if options.emulate_xpad:
-        layout = JOYSTICK_LAYOUTS["xpad"]
+    if options.emulate_xboxdrv:
+        layout = "xboxdrv"
+    elif options.emulate_xpad:
+        layout = "xpad"
+    elif options.emulate_xpad_wireless:
+        layout = "xpad_wireless"
     else:
-        layout = JOYSTICK_LAYOUTS["ds4"]
+        layout = "ds4"
+
+    layout = JOYSTICK_LAYOUTS[layout]
 
     try:
         joystick = UInputDevice(layout, mouse=options.trackpad_mouse)
