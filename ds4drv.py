@@ -41,7 +41,6 @@ HIDP_DATA_RTYPE_FEATURE = 0x03
 S16LE = Struct("<h")
 
 DS4Controller = namedtuple("DS4Controller", "id joystick options dynamic")
-
 DS4Report = namedtuple("DS4Report",
                        ["left_analog_x",
                         "left_analog_y",
@@ -86,15 +85,16 @@ DS4Report = namedtuple("DS4Report",
                         "plug_usb",
                         "plug_audio",
                         "plug_mic"])
-
-
 JoystickLayout = namedtuple("JoystickLayout",
-                            "name axes axes_options buttons hats")
+                            "name bustype vendor product version "
+                            "axes axes_options buttons hats")
 
 
 JOYSTICK_LAYOUTS = {
     "ds4": JoystickLayout(
         "Sony Computer Entertainment Wireless Controller",
+        # Bus type,     vendor, product, version
+        ecodes.BUS_USB, 1356,   1476,    273,
         # Axes
         {
             "ABS_X":        "left_analog_x",
@@ -145,6 +145,8 @@ JOYSTICK_LAYOUTS = {
 
     "xboxdrv": JoystickLayout(
         "Xbox Gamepad (userspace driver)",
+        # Bus type, vendor, product, version
+        0,          0,      0,       0,
         # Axes
         {
             "ABS_X":     "left_analog_x",
@@ -179,6 +181,8 @@ JOYSTICK_LAYOUTS = {
 
     "xpad": JoystickLayout(
         "Microsoft X-Box 360 pad",
+        # Bus type,      vendor, product, version
+        ecodes.BUS_USB,  1118,   654,     272,
         # Axes
         {
             "ABS_X":  "left_analog_x",
@@ -213,6 +217,8 @@ JOYSTICK_LAYOUTS = {
 
     "xpad_wireless": JoystickLayout(
         "Xbox 360 Wireless Receiver",
+        # Bus type,      vendor, product, version
+        ecodes.BUS_USB,  1118,   1817,    256,
         # Axes
         {
             "ABS_X":  "left_analog_x",
@@ -376,7 +382,9 @@ class UInputDevice(object):
         for name in layout.buttons:
             events[ecodes.EV_KEY].append(getattr(ecodes, name))
 
-        self.joystick = UInput(name=layout.name, events=events)
+        self.joystick = UInput(name=layout.name, events=events,
+                               bustype=layout.bustype, vendor=layout.vendor,
+                               product=layout.product, version=layout.version)
         self.layout = layout
 
     def emit(self, report):
