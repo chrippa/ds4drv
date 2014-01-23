@@ -1,5 +1,5 @@
 [Unit]
-Description=Start ds4drv as a daemon.
+Description=ds4drv daemon
 Requires=bluetooth.service
 After=bluetooth.service
 
