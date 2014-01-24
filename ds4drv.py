@@ -618,6 +618,8 @@ class ControllerAction(argparse.Action):
 
 
 def hexcolor(color):
+    color = color.strip("#")
+
     if len(color) != 6:
         raise ValueError
 
