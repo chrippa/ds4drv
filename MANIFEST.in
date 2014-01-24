@@ -1,4 +1,4 @@
 include HISTORY.rst
 include README.rst
 include LICENSE
-include ds4drv.service
+include systemd/*
