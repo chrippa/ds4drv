@@ -828,3 +828,6 @@ def main():
         thread.controller = controller
         thread.start()
         threads.append(thread)
+
+if __name__ == "__main__":
+    main()
