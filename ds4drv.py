@@ -40,6 +40,9 @@ HIDP_DATA_RTYPE_FEATURE = 0x03
 
 S16LE = Struct("<h")
 
+BATTERY_MAX          = 8
+BATTERY_MAX_CHARGING = 11
+
 DS4Controller = namedtuple("DS4Controller", "id joystick options dynamic")
 DS4Report = namedtuple("DS4Report",
                        ["left_analog_x",
@@ -764,7 +767,46 @@ def read_device(device, controller):
 
     led_last_flash = time()
     led_flashing = True
+
+    status_battery = None
+    status_plug_usb = False
+    status_plug_audio = False
+    status_plug_mic = False
+
     for report in device.reports:
+        if report.plug_usb != status_plug_usb:
+            status_plug_usb = report.plug_usb
+            status_battery = None # Show battery status
+
+            if status_plug_usb:
+                Daemon.info("USB charger connected",
+                            subprefix=CONTROLLER_LOG.format(controller.id))
+            else:
+                Daemon.info("USB charger disconnected",
+                            subprefix=CONTROLLER_LOG.format(controller.id))
+
+        if report.battery != status_battery:
+            status_battery = report.battery
+
+            if status_plug_usb:
+                max_value = BATTERY_MAX_CHARGING
+            else:
+                max_value = BATTERY_MAX
+
+            Daemon.info("Battery is " + str(100 * status_battery // max_value) + " % charged",
+                        subprefix=CONTROLLER_LOG.format(controller.id))
+
+        if report.plug_audio != status_plug_audio or (status_plug_audio and report.plug_mic != status_plug_mic):
+            status_plug_audio = report.plug_audio
+            status_plug_mic = report.plug_mic
+
+            if status_plug_audio:
+                Daemon.info("Audio device " + status_plug_mic * "with microphone " + "connected",
+                            subprefix=CONTROLLER_LOG.format(controller.id))
+            else:
+                Daemon.info("Audio device disconnected",
+                            subprefix=CONTROLLER_LOG.format(controller.id))
+
         if options.battery_flash:
             if report.battery < 2 and not report.plug_usb:
                 if not led_flashing and (time() - led_last_flash) > 60:
