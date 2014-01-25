@@ -463,11 +463,42 @@ class DS4Device(object):
         self.ctl_sock = ctl_sock
         self.int_sock = int_sock
 
-        self.control(led_red=255, led_green=255, led_blue=255)
+        self._led = (0, 0, 0)
+        self._led_flash = (0, 0)
+        self._led_flashing = False
+
+        self.set_led(255, 255, 255)
+
+    def _control(self, **kwargs):
+        self.control(led_red=self._led[0], led_green=self._led[1],
+                     led_blue=self._led[2], flash_led1=self._led_flash[0],
+                     flash_led2=self._led_flash[1], **kwargs)
 
     def close(self):
         self.int_sock.close()
         self.ctl_sock.close()
+
+    def rumble(self, small=0, big=0):
+        self._control(small_rumble=small, big_rumble=big)
+
+    def set_led(self, red=0, green=0, blue=0):
+        self._led = (red, green, blue)
+        self._control()
+
+    def start_led_flash(self, on, off):
+        if not self._led_flashing:
+            self._led_flash = (on, off)
+            self._led_flashing = True
+            self._control()
+
+    def stop_led_flash(self):
+        if self._led_flashing:
+            self._led_flash = (0, 0)
+            self._led_flashing = False
+            # Call twice, once to stop flashing...
+            self._control()
+            # ...and once more to make sure LED is set.
+            self._control()
 
     def control(self, big_rumble=0, small_rumble=0,
                 led_red=0, led_green=0, led_blue=0,
