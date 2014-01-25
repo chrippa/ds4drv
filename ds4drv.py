@@ -34,14 +34,15 @@ L2CAP_PSM_HIDP_INTR = 0x13
 HIDP_TRANS_GET_REPORT = 0x40
 HIDP_TRANS_SET_REPORT = 0x50
 
-HIDP_DATA_RTYPE_INPUT = 0x01
-HIDP_DATA_RTYPE_OUTPUT = 0x02
+HIDP_DATA_RTYPE_INPUT   = 0x01
+HIDP_DATA_RTYPE_OUTPUT  = 0x02
 HIDP_DATA_RTYPE_FEATURE = 0x03
-
-S16LE = Struct("<h")
 
 BATTERY_MAX          = 8
 BATTERY_MAX_CHARGING = 11
+BATTERY_WARNING      = 2
+
+S16LE = Struct("<h")
 
 DS4Controller = namedtuple("DS4Controller", "id joystick options dynamic")
 DS4Report = namedtuple("DS4Report",
@@ -651,6 +652,111 @@ class ControllerAction(argparse.Action):
         namespace.controllers.append(controller)
 
 
+class ReportTimer(object):
+    def __init__(self, interval):
+        self.interval = interval
+        self.time = time()
+
+    def passed(self):
+        now = time()
+        if (now - self.time) > self.interval:
+            self.time = now
+            return True
+
+        return False
+
+
+class ReportAction(object):
+    def __init__(self, device, controller):
+        self.device = device
+        self.controller = controller
+        self.timers = {}
+
+    def add_timer(self, interval, func):
+        self.timers[func] = ReportTimer(interval)
+
+    def handle_report(self, report):
+        for func, timer in self.timers.items():
+            if timer.passed():
+                repeat = func(report)
+                if not repeat:
+                    self.timers.pop(func, None)
+
+
+class ReportActionBattery(ReportAction):
+    def __init__(self, device, controller):
+        super(ReportActionBattery, self).__init__(device, controller)
+
+        self.add_timer(60, self.check_battery)
+
+    def check_battery(self, report):
+        if report.battery < BATTERY_WARNING and not report.plug_usb:
+            self.device.start_led_flash(30, 30)
+            self.add_timer(5, lambda r: self.device.stop_led_flash())
+
+        return True
+
+
+class ReportActionJoystick(ReportAction):
+    def handle_report(self, report):
+        self.controller.joystick.emit(report)
+
+
+class ReportActionStatus(ReportAction):
+    def __init__(self, device, controller):
+        super(ReportActionStatus, self).__init__(device, controller)
+
+        self.report = None
+        self.add_timer(1, self.check_status)
+
+    def check_status(self, report):
+        if not self.report:
+            self.report = report
+            show_battery = True
+        else:
+            show_battery = False
+
+        # USB cable
+        if self.report.plug_usb != report.plug_usb:
+            plug_usb = report.plug_usb and "Connected" or "Disconnected"
+            show_battery = True
+
+            Daemon.info("USB: {0}", plug_usb,
+                        subprefix=CONTROLLER_LOG.format(self.controller.id))
+
+        # Battery level
+        if self.report.battery != report.battery or show_battery:
+            max_value = report.plug_usb and BATTERY_MAX_CHARGING or BATTERY_MAX
+            battery = 100 * report.battery // max_value
+
+            if battery < 100:
+                Daemon.info("Battery: {0}%", battery,
+                            subprefix=CONTROLLER_LOG.format(self.controller.id))
+            else:
+                Daemon.info("Battery: Fully charged",
+                            subprefix=CONTROLLER_LOG.format(self.controller.id))
+
+        # Audio cable
+        if (self.report.plug_audio != report.plug_audio or
+            self.report.plug_mic != report.plug_mic):
+
+            if report.plug_audio and report.plug_mic:
+                plug_audio = "Headset"
+            elif report.plug_audio:
+                plug_audio = "Headphones"
+            elif report.plug_mic:
+                plug_audio = "Mic"
+            else:
+                plug_audio = "Speaker"
+
+            Daemon.info("Audio: {0}", plug_audio,
+                        subprefix=CONTROLLER_LOG.format(self.controller.id))
+
+        self.report = report
+
+        return True
+
+
 def hexcolor(color):
     color = color.strip("#")
 
@@ -791,72 +897,17 @@ def find_devices():
 
 
 def read_device(device, controller):
-    options = controller.options
-    device.control(led_red=options.led[0],
-                   led_green=options.led[1],
-                   led_blue=options.led[2])
+    device.set_led(*controller.options.led)
 
-    led_last_flash = time()
-    led_flashing = True
+    actions = [cls(device, controller) for cls in
+               (ReportActionJoystick, ReportActionStatus)]
 
-    status_battery = None
-    status_plug_usb = False
-    status_plug_audio = False
-    status_plug_mic = False
+    if controller.options.battery_flash:
+        actions.append(ReportActionBattery(device, controller))
 
     for report in device.reports:
-        if report.plug_usb != status_plug_usb:
-            status_plug_usb = report.plug_usb
-            status_battery = None # Show battery status
-
-            if status_plug_usb:
-                Daemon.info("USB charger connected",
-                            subprefix=CONTROLLER_LOG.format(controller.id))
-            else:
-                Daemon.info("USB charger disconnected",
-                            subprefix=CONTROLLER_LOG.format(controller.id))
-
-        if report.battery != status_battery:
-            status_battery = report.battery
-
-            if status_plug_usb:
-                max_value = BATTERY_MAX_CHARGING
-            else:
-                max_value = BATTERY_MAX
-
-            Daemon.info("Battery is " + str(100 * status_battery // max_value) + " % charged",
-                        subprefix=CONTROLLER_LOG.format(controller.id))
-
-        if report.plug_audio != status_plug_audio or (status_plug_audio and report.plug_mic != status_plug_mic):
-            status_plug_audio = report.plug_audio
-            status_plug_mic = report.plug_mic
-
-            if status_plug_audio:
-                Daemon.info("Audio device " + status_plug_mic * "with microphone " + "connected",
-                            subprefix=CONTROLLER_LOG.format(controller.id))
-            else:
-                Daemon.info("Audio device disconnected",
-                            subprefix=CONTROLLER_LOG.format(controller.id))
-
-        if options.battery_flash:
-            if report.battery < 2 and not report.plug_usb:
-                if not led_flashing and (time() - led_last_flash) > 60:
-                    device.control(led_red=options.led[0],
-                                   led_green=options.led[1],
-                                   led_blue=options.led[2],
-                                   flash_led1=30, flash_led2=30)
-                    led_flashing = True
-                    led_last_flash = time()
-
-            if led_flashing and (time() - led_last_flash) > 5:
-                device.control(flash_led1=0, flash_led2=0)
-                device.control(led_red=options.led[0],
-                               led_green=options.led[1],
-                               led_blue=options.led[2])
-                led_flashing = False
-
-
-        controller.joystick.emit(report)
+        for action in actions:
+            action.handle_report(report)
 
     Daemon.info("Disconnected",
                 subprefix=CONTROLLER_LOG.format(controller.id))
