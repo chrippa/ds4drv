@@ -1,4 +1,5 @@
 import socket
+import sys
 
 from collections import namedtuple
 from struct import Struct
@@ -159,66 +160,77 @@ class DS4Device(object):
         if ret < 79:
             return False
 
-        buf = self.buf
-        dpad = buf[8] % 16
+        # No need for a extra copy on Python 3.3+
+        if sys.version_info[0] == 3 and sys.version_info[1] >= 3:
+            buf = memoryview(self.buf)
+        else:
+            buf = self.buf
+
+        # Cut off bluetooth data
+        buf = buf[3:]
+
+        return self.parse_report(buf)
+
+    def parse_report(self, buf):
+        dpad = buf[5] % 16
 
         return DS4Report(
             # Left analog stick
-            buf[4], buf[5],
+            buf[1], buf[2],
 
             # Right analog stick
-            buf[6], buf[7],
+            buf[3], buf[4],
 
             # L2 and R2 analog
-            buf[11], buf[12],
+            buf[8], buf[9],
 
             # DPad up, down, left, right
             (dpad in (0, 1, 7)), (dpad in (3, 4, 5)),
             (dpad in (5, 6, 7)), (dpad in (1, 2, 3)),
 
             # Buttons cross, circle, square, triangle
-            (buf[8] & 32) != 0, (buf[8] & 64) != 0,
-            (buf[8] & 16) != 0, (buf[8] & 128) != 0,
+            (buf[5] & 32) != 0, (buf[5] & 64) != 0,
+            (buf[5] & 16) != 0, (buf[5] & 128) != 0,
 
             # L1, L2 and L3 buttons
-            (buf[9] & 1) != 0, (buf[9] & 4) != 0, (buf[9] & 64) != 0,
+            (buf[6] & 1) != 0, (buf[6] & 4) != 0, (buf[6] & 64) != 0,
 
             # R1, R2,and R3 buttons
-            (buf[9] & 2) != 0, (buf[9] & 8) != 0, (buf[9] & 128) != 0,
+            (buf[6] & 2) != 0, (buf[6] & 8) != 0, (buf[6] & 128) != 0,
 
             # Share and option buttons
-            (buf[9] & 16) != 0, (buf[9] & 32) != 0,
+            (buf[6] & 16) != 0, (buf[6] & 32) != 0,
 
             # Trackpad and PS buttons
-            (buf[10] & 2) != 0, (buf[10] & 1) != 0,
+            (buf[7] & 2) != 0, (buf[7] & 1) != 0,
 
             # Acceleration
-            S16LE.unpack(buf[16:18])[0],
-            S16LE.unpack(buf[18:20])[0],
-            S16LE.unpack(buf[20:22])[0],
+            S16LE.unpack(buf[13:15])[0],
+            S16LE.unpack(buf[15:17])[0],
+            S16LE.unpack(buf[17:19])[0],
 
             # Orientation
-            -(S16LE.unpack(buf[22:24])[0]),
-            S16LE.unpack(buf[24:26])[0],
-            S16LE.unpack(buf[26:28])[0],
+            -(S16LE.unpack(buf[19:21])[0]),
+            S16LE.unpack(buf[21:23])[0],
+            S16LE.unpack(buf[23:25])[0],
 
             # Trackpad touch 1: id, active, x, y
-            buf[38] & 0x7f, (buf[38] >> 7) == 0,
-            ((buf[40] & 0x0f) << 8) | buf[39],
-            buf[41] << 4 | ((buf[40] & 0xf0) >> 4),
+            buf[35] & 0x7f, (buf[35] >> 7) == 0,
+            ((buf[37] & 0x0f) << 8) | buf[36],
+            buf[38] << 4 | ((buf[37] & 0xf0) >> 4),
 
             # Trackpad touch 2: id, active, x, y
-            buf[42] & 0x7f, (buf[42] >> 7) == 0,
-            ((buf[44] & 0x0f) << 8) | buf[43],
-            buf[45] << 4 | ((buf[44] & 0xf0) >> 4),
+            buf[39] & 0x7f, (buf[39] >> 7) == 0,
+            ((buf[41] & 0x0f) << 8) | buf[40],
+            buf[42] << 4 | ((buf[41] & 0xf0) >> 4),
 
             # Timestamp and battery
-            buf[10] >> 2,
-            buf[33] % 16,
+            buf[7] >> 2,
+            buf[30] % 16,
 
             # External inputs (usb, audio, mic)
-            (buf[33] & 16) != 0, (buf[33] & 32) != 0,
-            (buf[33] & 64) != 0
+            (buf[30] & 16) != 0, (buf[30] & 32) != 0,
+            (buf[30] & 64) != 0
         )
 
     @property
@@ -236,4 +248,3 @@ class DS4Device(object):
                 yield report
             else:
                 Daemon.warn("Got simplified HID report, ignoring")
-
