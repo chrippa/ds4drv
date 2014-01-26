@@ -14,9 +14,9 @@ setup(name="ds4drv",
       license="MIT",
       long_description=readme + "\n\n" + history,
       entry_points={
-        "console_scripts": ["ds4drv=ds4drv:main"]
+        "console_scripts": ["ds4drv=ds4drv.__main__:main"]
       },
-      py_modules=["ds4drv"],
+      packages=["ds4drv"],
       install_requires=["evdev"],
       classifiers=[
         "Development Status :: 4 - Beta",
