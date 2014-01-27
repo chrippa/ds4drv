@@ -2,17 +2,15 @@ import atexit
 import os
 import sys
 
-from threading import Lock
 from signal import signal, SIGTERM
 
-
-CONTROLLER_LOG = "Controller {0}"
-BLUETOOTH_LOG = "Bluetooth"
+from .logger import Logger
 
 
 class Daemon(object):
-    lock = Lock()
-    output = sys.stdout
+    logger = Logger()
+    logger.set_level("info")
+    logger_module = logger.new_module("daemon")
 
     @classmethod
     def fork(cls, logfile, pidfile):
@@ -20,7 +18,8 @@ class Daemon(object):
             cls.exit("ds4drv appears to already be running. Kill it "
                      "or remove {0} if it's not really running.", pidfile)
 
-        cls.info("Forking into background, writing log to {0}", logfile)
+        cls.logger_module.info("Forking into background, writing log to {0}",
+                               logfile)
 
         try:
             pid = os.fork()
@@ -71,34 +70,13 @@ class Daemon(object):
                 cls.exit("Failed to open log file: {0} ({1})", logfile, err)
 
         try:
-            cls.output = open(logfile, "w")
+            output = open(logfile, "w")
         except OSError as err:
             cls.exit("Failed to open log file: {0} ({1})", logfile, err)
 
-    @classmethod
-    def msg(cls, prefix, fmt, *args, **kwargs):
-        subprefix = kwargs.pop("subprefix", None)
-
-        if subprefix:
-            msg = "[{0}][{1}] ".format(prefix, subprefix)
-        else:
-            msg = "[{0}] ".format(prefix)
-
-        msg += fmt.format(*args, **kwargs)
-
-        with cls.lock:
-            cls.output.write(msg + "\n")
-            cls.output.flush()
-
-    @classmethod
-    def info(cls, *args, **kwargs):
-        cls.msg("info", *args, **kwargs)
-
-    @classmethod
-    def warn(cls, *args, **kwargs):
-        cls.msg("warning", *args, **kwargs)
+        cls.logger.set_output(output)
 
     @classmethod
     def exit(cls, *args, **kwargs):
-        cls.msg("error", *args, **kwargs)
+        cls.logger_module.error(*args, **kwargs)
         sys.exit(1)

@@ -1,21 +1,5 @@
-import socket
-import sys
-
 from collections import namedtuple
 from struct import Struct
-
-from .daemon import Daemon
-
-
-L2CAP_PSM_HIDP_CTRL = 0x11
-L2CAP_PSM_HIDP_INTR = 0x13
-
-HIDP_TRANS_GET_REPORT = 0x40
-HIDP_TRANS_SET_REPORT = 0x50
-
-HIDP_DATA_RTYPE_INPUT   = 0x01
-HIDP_DATA_RTYPE_OUTPUT  = 0x02
-HIDP_DATA_RTYPE_FEATURE = 0x03
 
 S16LE = Struct("<h")
 
@@ -66,25 +50,9 @@ DS4Report = namedtuple("DS4Report",
 
 
 class DS4Device(object):
-    @classmethod
-    def connect(cls, addr):
-        ctl_socket = socket.socket(socket.AF_BLUETOOTH, socket.SOCK_SEQPACKET,
-                                   socket.BTPROTO_L2CAP)
-
-        ctl_socket.connect((addr, L2CAP_PSM_HIDP_CTRL))
-
-        int_socket = socket.socket(socket.AF_BLUETOOTH, socket.SOCK_SEQPACKET,
-                                   socket.BTPROTO_L2CAP)
-
-        int_socket.connect((addr, L2CAP_PSM_HIDP_INTR))
-
-        return cls(addr, ctl_socket, int_socket)
-
-    def __init__(self, bdaddr, ctl_sock, int_sock):
-        self.bdaddr = bdaddr
-        self.buf = bytearray(79)
-        self.ctl_sock = ctl_sock
-        self.int_sock = int_sock
+    def __init__(self, name, type):
+        self.name = name
+        self.type = type
 
         self._led = (0, 0, 0)
         self._led_flash = (0, 0)
@@ -96,10 +64,6 @@ class DS4Device(object):
         self.control(led_red=self._led[0], led_green=self._led[1],
                      led_blue=self._led[2], flash_led1=self._led_flash[0],
                      flash_led2=self._led_flash[1], **kwargs)
-
-    def close(self):
-        self.int_sock.close()
-        self.ctl_sock.close()
 
     def rumble(self, small=0, big=0):
         self._control(small_rumble=small, big_rumble=big)
@@ -126,50 +90,35 @@ class DS4Device(object):
     def control(self, big_rumble=0, small_rumble=0,
                 led_red=0, led_green=0, led_blue=0,
                 flash_led1=0, flash_led2=0):
-        hid = bytearray((HIDP_TRANS_SET_REPORT | HIDP_DATA_RTYPE_OUTPUT,))
-        pkt = bytearray(78)
-        pkt[0] = 0x11
-        pkt[1] = 128
-        pkt[3] = 255
+        if self.type == "bluetooth":
+            pkt = bytearray(77)
+            pkt[0] = 128
+            pkt[2] = 255
+            offset = 2
+            report_id = 0x11
+
+        elif self.type == "usb":
+            pkt = bytearray(31)
+            pkt[0] = 255
+            offset = 0
+            report_id = 0x05
 
         # Rumble
-        pkt[6] = big_rumble
-        pkt[7] = small_rumble
+        pkt[offset+3] = big_rumble
+        pkt[offset+4] = small_rumble
 
         # LED (red, green, blue)
-        pkt[8] = led_red
-        pkt[9] = led_green
-        pkt[10] = led_blue
+        pkt[offset+5] = led_red
+        pkt[offset+6] = led_green
+        pkt[offset+7] = led_blue
 
         # Time to flash bright (255 = 2.5 seconds)
-        pkt[11] = flash_led1
+        pkt[offset+8] = flash_led1
 
         # Time to flash dark (255 = 2.5 seconds)
-        pkt[12] = flash_led2
+        pkt[offset+9] = flash_led2
 
-        self.ctl_sock.sendall(bytes(hid + pkt))
-
-    def read_report(self):
-        ret = self.int_sock.recv_into(self.buf)
-
-        # Disconnection
-        if ret == 0:
-            return
-
-        # Invalid report size, just ignore it
-        if ret < 79:
-            return False
-
-        # No need for a extra copy on Python 3.3+
-        if sys.version_info[0] == 3 and sys.version_info[1] >= 3:
-            buf = memoryview(self.buf)
-        else:
-            buf = self.buf
-
-        # Cut off bluetooth data
-        buf = buf[3:]
-
-        return self.parse_report(buf)
+        self.write_report(report_id, pkt)
 
     def parse_report(self, buf):
         dpad = buf[5] % 16
@@ -233,6 +182,15 @@ class DS4Device(object):
             (buf[30] & 64) != 0
         )
 
+    def read_report(self):
+        pass
+
+    def write_report(self, report_id, data):
+        pass
+
+    def close(self):
+        pass
+
     @property
     def reports(self):
         while True:
@@ -246,5 +204,3 @@ class DS4Device(object):
 
             if report:
                 yield report
-            else:
-                Daemon.warn("Got simplified HID report, ignoring")

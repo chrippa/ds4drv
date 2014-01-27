@@ -1,24 +1,23 @@
 import argparse
-import os
 import sys
 
 from collections import namedtuple
 from threading import Thread
 
-from evdev import UInputError
-
 from . import __version__
-from .daemon import Daemon, CONTROLLER_LOG
-from .bluetooth import bluetooth_check, find_devices
-from .joystick import JOYSTICK_LAYOUTS, UInputDevice
 from .actions import (ReportActionBattery, ReportActionJoystick,
                       ReportActionStatus)
+from .backends import BluetoothBackend, HidrawBackend
+from .daemon import Daemon
+from .exceptions import BackendError, JoystickError
+from .joystick import create_joystick
 
 
 DAEMON_LOG_FILE = "~/.cache/ds4drv.log"
 DAEMON_PID_FILE = "/tmp/ds4drv.pid"
 
-DS4Controller = namedtuple("DS4Controller", "id joystick options dynamic")
+DS4Controller = namedtuple("DS4Controller",
+                           "id joystick options dynamic logger")
 
 
 class ControllerAction(argparse.Action):
@@ -72,6 +71,10 @@ parser = argparse.ArgumentParser(prog="ds4drv")
 parser.add_argument("--version", action="version",
                     version="%(prog)s {0}".format(__version__))
 
+backendopt = parser.add_argument_group("backend options")
+backendopt.add_argument("--hidraw", action="store_true",
+                        help="use hidraw devices. (WIP)")
+
 daemonopt = parser.add_argument_group("daemon options")
 daemonopt.add_argument("--daemon", action="store_true",
                        help="run in the background as a daemon")
@@ -104,16 +107,7 @@ controllopt.add_argument("--next-controller", nargs=0, action=ControllerAction,
                          help="creates another controller")
 
 
-def next_joystick_device():
-    for i in range(100):
-        dev = "/dev/input/js{0}".format(i)
-        if not os.path.exists(dev):
-            return dev
-
-
 def create_controller(index, options, dynamic=False):
-    jsdev = next_joystick_device()
-
     if options.emulate_xboxdrv:
         layout = "xboxdrv"
     elif options.emulate_xpad:
@@ -123,18 +117,15 @@ def create_controller(index, options, dynamic=False):
     else:
         layout = "ds4"
 
-    layout = JOYSTICK_LAYOUTS[layout]
-
     try:
-        joystick = UInputDevice(layout, mouse=options.trackpad_mouse)
-    except UInputError as err:
+        joystick = create_joystick(layout, mouse=options.trackpad_mouse)
+    except JoystickError as err:
         Daemon.exit("Failed to create joystick device: {0}", err)
 
-    controller = DS4Controller(index, joystick, options, dynamic)
-
-    Daemon.info("Created devices {0} (joystick) {1} (evdev)",
-                jsdev, joystick.joystick.device.fn,
-                subprefix=CONTROLLER_LOG.format(controller.id))
+    logger = Daemon.logger.new_module("controller {0}".format(index))
+    controller = DS4Controller(index, joystick, options, dynamic, logger)
+    controller.logger.info("Created devices {0} (joystick) {1} (evdev)",
+                           joystick.jsdev, joystick.joystick.device.fn)
 
     return controller
 
@@ -152,15 +143,22 @@ def read_device(device, controller):
         for action in actions:
             action.handle_report(report)
 
-    Daemon.info("Disconnected",
-                subprefix=CONTROLLER_LOG.format(controller.id))
+    controller.logger.info("Disconnected")
     device.close()
 
 
 def main():
     options = parser.parse_args(sys.argv[1:] + ["--next-controller"])
 
-    bluetooth_check()
+    if options.hidraw:
+        backend = HidrawBackend(Daemon.logger)
+    else:
+        backend = BluetoothBackend(Daemon.logger)
+
+    try:
+        backend.setup()
+    except BackendError as err:
+        Daemon.exit(err)
 
     if options.daemon:
         Daemon.fork(options.daemon_log, options.daemon_pid)
@@ -172,7 +170,7 @@ def main():
         controller = create_controller(index + 1, options)
         controllers.append(controller)
 
-    for device in find_devices():
+    for device in backend.devices:
         for thread in threads:
             # Reclaim the joystick device if the controller is gone
             if not thread.is_alive():
@@ -189,8 +187,7 @@ def main():
         else:
             controller = controllers.pop(0)
 
-        Daemon.info("Connected to {0}", device.bdaddr,
-                    subprefix=CONTROLLER_LOG.format(controller.id))
+        controller.logger.info("Connected to {0}", device.name)
 
         thread = Thread(target=read_device, args=(device, controller))
         thread.daemon = True

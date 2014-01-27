@@ -1,7 +1,10 @@
+import os.path
+
 from collections import namedtuple
 
-from evdev import UInput, ecodes
+from evdev import UInput, UInputError, ecodes
 
+from .exceptions import JoystickError
 
 JoystickLayout = namedtuple("JoystickLayout",
                             "name bustype vendor product version "
@@ -172,10 +175,17 @@ JOYSTICK_LAYOUTS = {
     )
 }
 
+def next_joystick_device():
+    for i in range(100):
+        dev = "/dev/input/js{0}".format(i)
+        if not os.path.exists(dev):
+            return dev
+
 
 class UInputDevice(object):
     def __init__(self, layout, mouse=False):
         self.mouse = None
+        self.jsdev = next_joystick_device()
         self.create_joystick(layout)
 
         if mouse:
@@ -260,3 +270,17 @@ class UInputDevice(object):
         self.mouse.write(ecodes.EV_KEY, ecodes.BTN_LEFT,
                          int(report.button_trackpad))
         self.mouse.syn()
+
+
+def create_joystick(layout, mouse=False):
+    layout = JOYSTICK_LAYOUTS.get(layout)
+
+    if not layout:
+        raise JoystickError("Unknown joystick layout: {0}", layout)
+
+    try:
+        joystick = UInputDevice(layout, mouse=mouse)
+    except UInputError as err:
+        raise JoystickError(err)
+
+    return joystick

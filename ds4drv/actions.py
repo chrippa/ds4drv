@@ -1,8 +1,5 @@
 from time import time
 
-from .daemon import Daemon, CONTROLLER_LOG
-
-
 BATTERY_MAX          = 8
 BATTERY_MAX_CHARGING = 11
 BATTERY_WARNING      = 2
@@ -77,8 +74,7 @@ class ReportActionStatus(ReportAction):
             plug_usb = report.plug_usb and "Connected" or "Disconnected"
             show_battery = True
 
-            Daemon.info("USB: {0}", plug_usb,
-                        subprefix=CONTROLLER_LOG.format(self.controller.id))
+            self.controller.logger.info("USB: {0}", plug_usb)
 
         # Battery level
         if self.report.battery != report.battery or show_battery:
@@ -86,11 +82,9 @@ class ReportActionStatus(ReportAction):
             battery = 100 * report.battery // max_value
 
             if battery < 100:
-                Daemon.info("Battery: {0}%", battery,
-                            subprefix=CONTROLLER_LOG.format(self.controller.id))
+                self.controller.logger.info("Battery: {0}%", battery)
             else:
-                Daemon.info("Battery: Fully charged",
-                            subprefix=CONTROLLER_LOG.format(self.controller.id))
+                self.controller.logger.info("Battery: Fully charged")
 
         # Audio cable
         if (self.report.plug_audio != report.plug_audio or
@@ -105,8 +99,7 @@ class ReportActionStatus(ReportAction):
             else:
                 plug_audio = "Speaker"
 
-            Daemon.info("Audio: {0}", plug_audio,
-                        subprefix=CONTROLLER_LOG.format(self.controller.id))
+            self.controller.logger.info("Audio: {0}", plug_audio)
 
         self.report = report
 
