@@ -16,10 +16,8 @@ setup(name="ds4drv",
       entry_points={
         "console_scripts": ["ds4drv=ds4drv.__main__:main"]
       },
-      packages=["ds4drv", "ds4drv.backends",
-                "ds4drv.backends.bluetooth",
-                "ds4drv.backends.hidraw"],
-      install_requires=["evdev"],
+      packages=["ds4drv", "ds4drv.backends"]
+      install_requires=["evdev", "pyudev"],
       classifiers=[
         "Development Status :: 4 - Beta",
         "Environment :: Console",
