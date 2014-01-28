@@ -5,7 +5,8 @@ REPORT_SIZE = 64
 
 
 class HidrawUSBDS4Device(HidrawDS4Device):
-    def get_hid_name():
+    @staticmethod
+    def hid_name():
         return 'Sony Computer Entertainment Wireless Controller'
 
     def __init__(self, hidraw_device, type, sys_name):
