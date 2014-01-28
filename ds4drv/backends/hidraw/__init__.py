@@ -44,10 +44,10 @@ class HidrawBackend(Backend):
 
             try:
                 if udev_device['HID_NAME'] == HidrawBluetoothDS4Device.get_hid_name():
-                    name = 'Bluetooth Controller (' + udev_device['HID_UNIQ'] + ' ' + hidraw_device.sys_name + ')'
-                    yield HidrawBluetoothDS4Device.open(name, 'bluetooth', hidraw_device.device_node)
+                    yield HidrawBluetoothDS4Device(hidraw_device.device_node, 'bluetooth',
+                                                   udev_device['HID_UNIQ'], hidraw_device.sys_name)
                 elif udev_device['HID_NAME'] == HidrawUSBDS4Device.get_hid_name():
-                    name = 'USB Controller (' + hidraw_device.sys_name + ')'
-                    yield HidrawUSBDS4Device.open(name, 'usb', hidraw_device.device_node)
+                    yield HidrawUSBDS4Device(hidraw_device.device_node, 'usb',
+                                             hidraw_device.sys_name)
             except DeviceError as err:
                 self.logger.error("Unable to open DS4 device: {0}", err)

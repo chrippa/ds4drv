@@ -30,12 +30,12 @@ class BluetoothDS4Device(DS4Device):
 
         return cls(addr, ctl_socket, int_socket)
 
-    def __init__(self, name, ctl_sock, int_sock):
+    def __init__(self, addr, ctl_sock, int_sock):
         self.buf = bytearray(REPORT_SIZE)
         self.ctl_sock = ctl_sock
         self.int_sock = int_sock
 
-        super(BluetoothDS4Device, self).__init__(name, "bluetooth")
+        super(BluetoothDS4Device, self).__init__(addr, "bluetooth")
 
     def read_report(self):
         ret = self.int_sock.recv_into(self.buf)

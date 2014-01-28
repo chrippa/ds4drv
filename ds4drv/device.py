@@ -50,8 +50,8 @@ DS4Report = namedtuple("DS4Report",
 
 
 class DS4Device(object):
-    def __init__(self, name, type):
-        self.name = name
+    def __init__(self, device_name, type):
+        self.device_name = device_name
         self.type = type
 
         self._led = (0, 0, 0)
@@ -190,6 +190,17 @@ class DS4Device(object):
 
     def close(self):
         pass
+
+    @property
+    def type_name(self):
+        if self.type == 'bluetooth':
+            return 'Bluetooth'
+        elif self.type == 'usb':
+            return 'USB'
+
+    @property
+    def name(self):
+        return self.type_name + ' Controller (' + self.device_name + ')'
 
     @property
     def reports(self):

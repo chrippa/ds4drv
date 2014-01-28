@@ -5,21 +5,16 @@ from ...device import DS4Device
 
 
 class HidrawDS4Device(DS4Device):
-    @classmethod
-    def open(cls, name, type, hidraw):
+    def __init__(self, hidraw_device, type, device_name, report_size):
         try:
-            fd = open(hidraw, "rb+", 0)
+            self.fd = open(hidraw_device, "rb+", 0)
         except OSError as err:
             raise DeviceError(err)
 
-        return cls(name, type, fd)
-
-    def __init__(self, name, type, fd, report_size):
-        self.fd = fd
         self.report_size = report_size
         self.buf = bytearray(self.report_size)
 
-        super(HidrawDS4Device, self).__init__(name, type)
+        super(HidrawDS4Device, self).__init__(device_name, type)
 
     def read_report(self):
         ret = self.fd.readinto(self.buf)
