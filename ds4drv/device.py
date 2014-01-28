@@ -198,7 +198,7 @@ class DS4Device(object):
         elif self.type == "usb":
             type_name = "USB"
 
-        return type_name + " Controller (" + self.device_name + ")"
+        return "{0} Controller ({1})".format(type_name, self.device_name)
 
     @property
     def reports(self):

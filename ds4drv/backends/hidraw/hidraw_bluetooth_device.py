@@ -11,7 +11,7 @@ class HidrawBluetoothDS4Device(HidrawDS4Device):
         return "Wireless Controller"
 
     def __init__(self, hidraw_device, type, addr, sys_name):
-        device_name = addr + " " + sys_name
+        device_name = "{0} {1}".format(addr, sys_name)
 
         super(HidrawBluetoothDS4Device, self).__init__(hidraw_device, type, device_name, REPORT_SIZE)
 
