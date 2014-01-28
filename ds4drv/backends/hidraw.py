@@ -8,18 +8,13 @@ from ..device import DS4Device
 from ..utils import zero_copy_slice
 
 
-REPORT_SIZE_BLUETOOTH = 78
-REPORT_SIZE_USB       = 64
-
-
 class HidrawDS4Device(DS4Device):
-    def __init__(self, hidraw_device, type, device_name, report_size):
+    def __init__(self, hidraw_device, type, device_name):
         try:
             self.fd = open(hidraw_device, "rb+", 0)
         except OSError as err:
             raise DeviceError(err)
 
-        self.report_size = report_size
         self.buf = bytearray(self.report_size)
 
         super(HidrawDS4Device, self).__init__(device_name, type)
@@ -50,6 +45,10 @@ class HidrawDS4Device(DS4Device):
     def close(self):
         self.fd.close()
 
+    @property
+    def report_size(self):
+        raise NotImplementedError
+
 
 class HidrawBluetoothDS4Device(HidrawDS4Device):
     @staticmethod
@@ -59,11 +58,15 @@ class HidrawBluetoothDS4Device(HidrawDS4Device):
     def __init__(self, hidraw_device, type, addr, sys_name):
         device_name = "{0} {1}".format(addr, sys_name)
 
-        super(HidrawBluetoothDS4Device, self).__init__(hidraw_device, type, device_name, REPORT_SIZE_BLUETOOTH)
+        super(HidrawBluetoothDS4Device, self).__init__(hidraw_device, type, device_name)
 
     def get_trimmed_report_data(self):
         # Cut off bluetooth data
         return zero_copy_slice(self.buf, 2)
+
+    @property
+    def report_size(self):
+        return 78
 
 
 class HidrawUSBDS4Device(HidrawDS4Device):
@@ -72,10 +75,14 @@ class HidrawUSBDS4Device(HidrawDS4Device):
         return "Sony Computer Entertainment Wireless Controller"
 
     def __init__(self, hidraw_device, type, sys_name):
-        super(HidrawUSBDS4Device, self).__init__(hidraw_device, type, sys_name, REPORT_SIZE_USB)
+        super(HidrawUSBDS4Device, self).__init__(hidraw_device, type, sys_name)
 
     def get_trimmed_report_data(self):
         return self.buf
+
+    @property
+    def report_size(self):
+        return 64
 
 
 class HidrawBackend(Backend):
