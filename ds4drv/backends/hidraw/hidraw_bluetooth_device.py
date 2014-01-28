@@ -7,6 +7,9 @@ REPORT_SIZE = 78
 
 
 class HidrawBluetoothDS4Device(HidrawDS4Device):
+    def get_hid_name():
+        return 'Wireless Controller'
+
     def __init__(self, name, type, fd):
         super(HidrawBluetoothDS4Device, self).__init__(name, type, fd, REPORT_SIZE)
 

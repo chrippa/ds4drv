@@ -7,10 +7,6 @@ from .hidraw_bluetooth_device import HidrawBluetoothDS4Device
 from .hidraw_usb_device import HidrawUSBDS4Device
 
 
-HID_NAME_BLUETOOTH = 'Wireless Controller'
-HID_NAME_USB = 'Sony Computer Entertainment Wireless Controller'
-
-
 class HidrawBackend(Backend):
     __name__ = "hidraw"
 
@@ -20,7 +16,7 @@ class HidrawBackend(Backend):
     def get_future_devices(self, context):
         """Return a generator yielding new devices."""
         monitor = Monitor.from_netlink(context)
-        monitor.filter_by('hid')
+        monitor.filter_by('hidraw')
         monitor.start()
 
         self.scanning_log_message()
@@ -37,26 +33,21 @@ class HidrawBackend(Backend):
         """Wait for new DS4 devices to appear."""
         context = Context()
 
-        existing_devices = context.list_devices(subsystem='hid')
+        existing_devices = context.list_devices(subsystem='hidraw')
         future_devices = self.get_future_devices(context)
 
-        for udev_device in itertools.chain(existing_devices, future_devices):
-            if udev_device['HID_NAME'] == HID_NAME_BLUETOOTH:
-                type = 'bluetooth'
-            elif udev_device['HID_NAME'] == HID_NAME_USB:
-                type = 'usb'
-            else:
-                type = None
+        for hidraw_device in itertools.chain(existing_devices, future_devices):
+            udev_device = hidraw_device.parent
 
-            if type:
-                for child in udev_device.children:
-                    if child.subsystem == 'hidraw':
-                        try:
-                            if type == 'bluetooth':
-                                name = 'Bluetooth Controller (' + udev_device['HID_UNIQ'] + ' ' + child.sys_name + ')'
-                                yield HidrawBluetoothDS4Device.open(name, type, child.device_node)
-                            elif type == 'usb':
-                                name = 'USB Controller (' + child.sys_name + ')'
-                                yield HidrawUSBDS4Device.open(name, type, child.device_node)
-                        except DeviceError as err:
-                            self.logger.error("Unable to open DS4 device: {0}", err)
+            if udev_device.subsystem != 'hid':
+                continue
+
+            try:
+                if udev_device['HID_NAME'] == HidrawBluetoothDS4Device.get_hid_name():
+                    name = 'Bluetooth Controller (' + udev_device['HID_UNIQ'] + ' ' + hidraw_device.sys_name + ')'
+                    yield HidrawBluetoothDS4Device.open(name, 'bluetooth', hidraw_device.device_node)
+                elif udev_device['HID_NAME'] == HidrawUSBDS4Device.get_hid_name():
+                    name = 'USB Controller (' + hidraw_device.sys_name + ')'
+                    yield HidrawUSBDS4Device.open(name, 'usb', hidraw_device.device_node)
+            except DeviceError as err:
+                self.logger.error("Unable to open DS4 device: {0}", err)
