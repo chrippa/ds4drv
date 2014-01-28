@@ -1,8 +1,8 @@
 import socket
-import sys
 
 from ...exceptions import DeviceError
 from ...device import DS4Device
+from ...utils import zero_copy_slice
 
 L2CAP_PSM_HIDP_CTRL = 0x11
 L2CAP_PSM_HIDP_INTR = 0x13
@@ -48,14 +48,8 @@ class BluetoothDS4Device(DS4Device):
         if ret < REPORT_SIZE:
             return False
 
-        # No need for a extra copy on Python 3.3+
-        if sys.version_info[0] == 3 and sys.version_info[1] >= 3:
-            buf = memoryview(self.buf)
-        else:
-            buf = self.buf
-
         # Cut off bluetooth data
-        buf = buf[3:]
+        buf = zero_copy_slice(self.buf, 3)
 
         return self.parse_report(buf)
 
