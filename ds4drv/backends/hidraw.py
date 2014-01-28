@@ -7,7 +7,11 @@ from ..exceptions import DeviceError
 from ..device import DS4Device
 
 
-REPORT_SIZE = 78
+HID_NAME_BLUETOOTH = 'Wireless Controller'
+HID_NAME_USB = 'Sony Computer Entertainment Wireless Controller'
+
+REPORT_SIZE_BLUETOOTH = 78
+REPORT_SIZE_USB = 64
 
 
 class HidrawDS4Device(DS4Device):
@@ -18,11 +22,17 @@ class HidrawDS4Device(DS4Device):
         except OSError as err:
             raise DeviceError(err)
 
-        return cls(name, type, fd)
+        if type == 'bluetooth':
+            report_size = REPORT_SIZE_BLUETOOTH
+        elif type == 'usb':
+            report_size = REPORT_SIZE_USB
 
-    def __init__(self, name, type, fd):
+        return cls(name, type, fd, report_size)
+
+    def __init__(self, name, type, fd, report_size):
         self.fd = fd
-        self.buf = bytearray(REPORT_SIZE)
+        self.report_size = report_size
+        self.buf = bytearray(self.report_size)
 
         super(HidrawDS4Device, self).__init__(name, type)
 
@@ -34,17 +44,20 @@ class HidrawDS4Device(DS4Device):
             return
 
         # Invalid report size, just ignore it
-        if ret < REPORT_SIZE:
+        if ret < self.report_size:
             return False
 
-        # No need for a extra copy on Python 3.3+
-        if sys.version_info[0] == 3 and sys.version_info[1] >= 3:
-            buf = memoryview(self.buf)
-        else:
-            buf = self.buf
+        if self.type == 'bluetooth':
+            # No need for a extra copy on Python 3.3+
+            if sys.version_info[0] == 3 and sys.version_info[1] >= 3:
+                buf = memoryview(self.buf)
+            else:
+                buf = self.buf
 
-        # Cut off bluetooth data
-        buf = self.buf[2:]
+            # Cut off bluetooth data
+            buf = self.buf[2:]
+        elif self.type == 'usb':
+            buf = self.buf
 
         return self.parse_report(buf)
 
@@ -87,11 +100,22 @@ class HidrawBackend(Backend):
         future_devices = self.get_future_devices(context)
 
         for udev_device in itertools.chain(existing_devices, future_devices):
-            if udev_device['HID_NAME'] == 'Wireless Controller':
+            if udev_device['HID_NAME'] == HID_NAME_BLUETOOTH:
+                type = 'bluetooth'
+            elif udev_device['HID_NAME'] == HID_NAME_USB:
+                type = 'usb'
+            else:
+                type = None
+
+            if type:
                 for child in udev_device.children:
                     if child.subsystem == 'hidraw':
-                        name = udev_device['HID_UNIQ'] + ' (' + child.sys_name + ')'
+                        if type == 'bluetooth':
+                            name = 'Bluetooth Controller (' + udev_device['HID_UNIQ'] + ' ' + child.sys_name + ')'
+                        elif type == 'usb':
+                            name = 'USB Controller (' + child.sys_name + ')'
+
                         try:
-                            yield HidrawDS4Device.open(name, "bluetooth", child.device_node)
+                            yield HidrawDS4Device.open(name, type, child.device_node)
                         except DeviceError as err:
                             self.logger.error("Unable to open DS4 device: {0}", err)
