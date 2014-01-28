@@ -1,13 +1,13 @@
-"""Just a small stub to test USB hidraw."""
-
-from time import sleep
+import sys
+import itertools
+from pyudev import Context, Monitor
 
 from ..backend import Backend
 from ..exceptions import DeviceError
 from ..device import DS4Device
 
 
-REPORT_SIZE = 64
+REPORT_SIZE = 78
 
 
 class HidrawDS4Device(DS4Device):
@@ -37,7 +37,16 @@ class HidrawDS4Device(DS4Device):
         if ret < REPORT_SIZE:
             return False
 
-        return self.parse_report(self.buf)
+        # No need for a extra copy on Python 3.3+
+        if sys.version_info[0] == 3 and sys.version_info[1] >= 3:
+            buf = memoryview(self.buf)
+        else:
+            buf = self.buf
+
+        # Cut off bluetooth data
+        buf = self.buf[2:]
+
+        return self.parse_report(buf)
 
     def write_report(self, report_id, data):
         hid = bytearray((report_id,))
@@ -48,31 +57,41 @@ class HidrawDS4Device(DS4Device):
         self.fd.close()
 
 
-DEVICES = ["/dev/hidraw5"]
-
 class HidrawBackend(Backend):
     __name__ = "hidraw"
 
     def setup(self):
         pass
 
-    def find_device(self):
-        try:
-            d = DEVICES.pop(0)
-            return HidrawDS4Device.open(d, "usb", d)
-        except IndexError:
-            pass
+    def get_future_devices(self, context):
+        """Return a generator yielding new devices."""
+        monitor = Monitor.from_netlink(context)
+        monitor.filter_by('hid')
+        monitor.start()
+
+        self.scanning_log_message()
+        for device in iter(monitor.poll, None):
+            if device.action == 'add':
+                yield device
+                self.scanning_log_message()
+
+    def scanning_log_message(self):
+        self.logger.info("Scanning for devices")
 
     @property
     def devices(self):
         """Wait for new DS4 devices to appear."""
-        while True:
-            try:
-                device = self.find_device()
-                if device:
-                    yield device
-            except DeviceError as err:
-                self.logger.error("Unable to open DS4 device: {0}",
-                                  err)
+        context = Context()
 
-            sleep(1)
+        existing_devices = context.list_devices(subsystem='hid')
+        future_devices = self.get_future_devices(context)
+
+        for udev_device in itertools.chain(existing_devices, future_devices):
+            if udev_device['HID_NAME'] == 'Wireless Controller':
+                for child in udev_device.children:
+                    if child.subsystem == 'hidraw':
+                        name = udev_device['HID_UNIQ'] + ' (' + child.sys_name + ')'
+                        try:
+                            yield HidrawDS4Device.open(name, "bluetooth", child.device_node)
+                        except DeviceError as err:
+                            self.logger.error("Unable to open DS4 device: {0}", err)
