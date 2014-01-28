@@ -1,20 +1,17 @@
 import socket
-import sys
 import subprocess
 
 from ..backend import Backend
 from ..exceptions import BackendError, DeviceError
 from ..device import DS4Device
+from ..utils import zero_copy_slice
+
 
 L2CAP_PSM_HIDP_CTRL = 0x11
 L2CAP_PSM_HIDP_INTR = 0x13
 
-HIDP_TRANS_GET_REPORT = 0x40
 HIDP_TRANS_SET_REPORT = 0x50
-
-HIDP_DATA_RTYPE_INPUT   = 0x01
 HIDP_DATA_RTYPE_OUTPUT  = 0x02
-HIDP_DATA_RTYPE_FEATURE = 0x03
 
 REPORT_SIZE = 79
 
@@ -36,12 +33,12 @@ class BluetoothDS4Device(DS4Device):
 
         return cls(addr, ctl_socket, int_socket)
 
-    def __init__(self, name, ctl_sock, int_sock):
+    def __init__(self, addr, ctl_sock, int_sock):
         self.buf = bytearray(REPORT_SIZE)
         self.ctl_sock = ctl_sock
         self.int_sock = int_sock
 
-        super(BluetoothDS4Device, self).__init__(name, "bluetooth")
+        super(BluetoothDS4Device, self).__init__(addr, "bluetooth")
 
     def read_report(self):
         ret = self.int_sock.recv_into(self.buf)
@@ -54,14 +51,8 @@ class BluetoothDS4Device(DS4Device):
         if ret < REPORT_SIZE:
             return False
 
-        # No need for a extra copy on Python 3.3+
-        if sys.version_info[0] == 3 and sys.version_info[1] >= 3:
-            buf = memoryview(self.buf)
-        else:
-            buf = self.buf
-
         # Cut off bluetooth data
-        buf = buf[3:]
+        buf = zero_copy_slice(self.buf, 3)
 
         return self.parse_report(buf)
 
