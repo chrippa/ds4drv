@@ -192,15 +192,13 @@ class DS4Device(object):
         pass
 
     @property
-    def type_name(self):
-        if self.type == "bluetooth":
-            return "Bluetooth"
-        elif self.type == "usb":
-            return "USB"
-
-    @property
     def name(self):
-        return self.type_name + " Controller (" + self.device_name + ")"
+        if self.type == "bluetooth":
+            type_name = "Bluetooth"
+        elif self.type == "usb":
+            type_name = "USB"
+
+        return type_name + " Controller (" + self.device_name + ")"
 
     @property
     def reports(self):
