@@ -1,10 +1,10 @@
 import itertools
 from pyudev import Context, Monitor
 
-from ..backend import Backend
-from ..exceptions import DeviceError
-from ..devices.hidraw_bluetooth import HidrawBluetoothDS4Device
-from ..devices.hidraw_usb import HidrawUSBDS4Device
+from ...backend import Backend
+from ...exceptions import DeviceError
+from .hidraw_bluetooth_device import HidrawBluetoothDS4Device
+from .hidraw_usb_device import HidrawUSBDS4Device
 
 
 HID_NAME_BLUETOOTH = 'Wireless Controller'

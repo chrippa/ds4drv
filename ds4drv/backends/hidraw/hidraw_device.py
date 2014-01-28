@@ -1,7 +1,7 @@
 import sys
 
-from ..exceptions import DeviceError
-from ..device import DS4Device
+from ...exceptions import DeviceError
+from ...device import DS4Device
 
 
 class HidrawDS4Device(DS4Device):

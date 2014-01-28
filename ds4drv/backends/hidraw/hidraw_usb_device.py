@@ -1,4 +1,4 @@
-from .hidraw import HidrawDS4Device
+from .hidraw_device import HidrawDS4Device
 
 
 REPORT_SIZE = 64
