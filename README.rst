@@ -91,7 +91,7 @@ Permissions
 ds4drv uses the kernel module *uinput* to create input devices in user land and
 module *hidraw* to communicate with DualShock 4 controllers (when using
 ``--hidraw``), but this usually requires root permissions. You can change the
-permissions by copying the udev rules file (``udev/50-ds4drv.rules``) to ``/etc/udev/rules.d/``.
+permissions by copying the `udev rules file <udev/50-ds4drv.rules>`_ to ``/etc/udev/rules.d/``.
 
 You may have to reload your udev rules after this with:
 
