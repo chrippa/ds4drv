@@ -46,8 +46,11 @@ class HidrawDS4Device(DS4Device):
         self.fd.write(hid + data)
 
     def close(self):
-        self.fd.close()
-        self.input_device.ungrab()
+        try:
+            self.fd.close()
+            self.input_device.ungrab()
+        except IOError:
+            pass
 
     @property
     def report_size(self):
