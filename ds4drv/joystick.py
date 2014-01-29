@@ -271,6 +271,17 @@ class UInputDevice(object):
                          int(report.button_trackpad))
         self.mouse.syn()
 
+    def toggle_mouse(self):
+        if not self.mouse:
+            self.create_mouse()
+        else:
+            # Release buttons
+            self.mouse.write(ecodes.EV_KEY, ecodes.BTN_LEFT, False)
+            self.mouse.syn()
+
+            self.mouse = None
+
+        return self.mouse != None
 
 def create_joystick(layout, mouse=False):
     layout = JOYSTICK_LAYOUTS.get(layout)

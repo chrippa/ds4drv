@@ -6,7 +6,7 @@ from threading import Thread
 
 from . import __version__
 from .actions import (ReportActionBattery, ReportActionJoystick,
-                      ReportActionStatus)
+                      ReportActionStatus, ReportActionCommand)
 from .backends import BluetoothBackend, HidrawBackend
 from .daemon import Daemon
 from .exceptions import BackendError, JoystickError
@@ -22,7 +22,8 @@ DS4Controller = namedtuple("DS4Controller",
 
 class ControllerAction(argparse.Action):
     __options__ = ["battery_flash", "emulate_xboxdrv", "emulate_xpad",
-                   "emulate_xpad_wireless", "led", "trackpad_mouse"]
+                   "emulate_xpad_wireless", "led", "trackpad_mouse",
+                   "no_commands"]
 
     @classmethod
     def default_controller(cls):
@@ -103,6 +104,8 @@ controllopt.add_argument("--led", metavar="color", default="0000ff",
                               "e.g. 'ff0000' is red. Default is '0000ff' (blue)")
 controllopt.add_argument("--trackpad-mouse", action="store_true",
                          help="makes the trackpad control the mouse")
+controllopt.add_argument("--no-commands", action="store_true",
+                         help="disables controller commands")
 controllopt.add_argument("--next-controller", nargs=0, action=ControllerAction,
                          help="creates another controller")
 
@@ -138,6 +141,9 @@ def read_device(device, controller):
 
     if controller.options.battery_flash:
         actions.append(ReportActionBattery(device, controller))
+
+    if not controller.options.no_commands:
+        actions.append(ReportActionCommand(device, controller))
 
     for report in device.reports:
         for action in actions:
