@@ -2,8 +2,7 @@
 ds4drv
 ======
 
-ds4drv is a simple daemon that scans for DualShock 4 controllers, connects to
-them and creates a joystick device. This driver works with Bluetooth and USB.
+ds4drv is a userspace Linux driver for Sony DualShock 4 controller.
 
 
 Background
@@ -34,10 +33,10 @@ released which contains support for the DS4. This project is therefore only usef
 if you want to access any features not yet supported by the Linux kernel, such as LED
 color or trackpad mouse.
 
-**Update (2014-01-29):** ds4drv works now also via USB when used with
-'--hidraw'. In addition, the hidraw backend supports using paired Bluetooth
-devices, but Linux kernel currently does not allow sending correct reports
-DualShock 4 controllers. This may change in the future enabling Bluetooth
+**Update (2014-01-29):** ds4drv can now handle USB devices when used with
+``--hidraw``. In addition, the hidraw backend supports using paired Bluetooth
+devices, but the Linux kernel currently does not allow sending correct reports
+to DualShock 4 controllers. This may change in the future enabling Bluetooth
 pairing with ds4drv.
 
 
@@ -91,7 +90,7 @@ Permissions
 
 ds4drv uses the kernel module *uinput* to create input devices in user land and
 module *hidraw* to communicate with DualShock 4 controllers (when using
-'--hidraw'), but this usually requires root permissions. You can change the
+``--hidraw``), but this usually requires root permissions. You can change the
 permissions by copying the udev rules file (``udev/50-ds4drv.rules``) to ``/etc/udev/rules.d/``.
 
 You may have to reload your udev rules after this with:
