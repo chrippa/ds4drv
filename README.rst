@@ -84,13 +84,16 @@ the Share and PS button until the LED starts blinking.
 Permissions
 ^^^^^^^^^^^
 
-ds4drv uses the kernel module uinput to create input devices in user land,
-but this usually requires root permissions. You can change the permissions
-by creating a udev rule. Put this in ``/etc/udev/rules.d/50-uinput.rules``:
+ds4drv uses the kernel module *uinput* to create input devices in user land and
+module *hidraw* to communicate with DualShock 4 controllers (when using
+'--hidraw'), but this usually requires root permissions. You can change the
+permissions by creating a udev rule. Put this in ``/etc/udev/rules.d/50-uinput.rules``:
 
 ::
 
     KERNEL=="uinput", MODE="0666"
+    KERNEL=="hidraw*", SUBSYSTEM=="hidraw", ATTRS{idVendor}=="054c", ATTRS{idProduct}=="05c4", MODE="0666"
+    KERNEL=="hidraw*", SUBSYSTEM=="hidraw", KERNELS=="0005:054C:05C4.*", MODE="0666"
 
 You may have to reload your udev rules after this with:
 
