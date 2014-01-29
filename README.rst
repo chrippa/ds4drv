@@ -2,7 +2,7 @@
 ds4drv
 ======
 
-ds4drv is a userspace Linux driver for Sony DualShock 4 controller.
+ds4drv is a userspace Linux driver for the Sony DualShock 4 controller.
 
 
 Background
