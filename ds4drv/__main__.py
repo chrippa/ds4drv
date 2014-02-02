@@ -1,4 +1,5 @@
 import argparse
+import os
 import sys
 
 from collections import namedtuple
@@ -8,11 +9,13 @@ from . import __version__
 from .actions import (ReportActionBattery, ReportActionJoystick,
                       ReportActionStatus)
 from .backends import BluetoothBackend, HidrawBackend
+from .config import Config
 from .daemon import Daemon
 from .exceptions import BackendError, JoystickError
 from .joystick import create_joystick
 
 
+CONFIG_FILES = ("~/.config/ds4drv.conf", "/etc/ds4drv.conf")
 DAEMON_LOG_FILE = "~/.cache/ds4drv.log"
 DAEMON_PID_FILE = "/tmp/ds4drv.pid"
 
@@ -70,6 +73,13 @@ def hexcolor(color):
 parser = argparse.ArgumentParser(prog="ds4drv")
 parser.add_argument("--version", action="version",
                     version="%(prog)s {0}".format(__version__))
+
+configopt = parser.add_argument_group("configuration options")
+configopt.add_argument("--config", metavar="filename",
+                       type=os.path.expanduser,
+                       help="configuration file to read settings from. "
+                            "Default is ~/.config/ds4drv.conf or "
+                            "/etc/ds4drv.conf, whichever is found first")
 
 backendopt = parser.add_argument_group("backend options")
 backendopt.add_argument("--hidraw", action="store_true",
@@ -147,8 +157,45 @@ def read_device(device, controller):
     device.close()
 
 
-def main():
+def merge_options(src, dst, defaults):
+    for key, value in src.__dict__.items():
+        if key == "controllers":
+            continue
+
+        default = getattr(defaults, key)
+
+        if getattr(dst, key) == default and value != default:
+            setattr(dst, key, value)
+
+
+def load_options():
     options = parser.parse_args(sys.argv[1:] + ["--next-controller"])
+
+    config = Config()
+    config_paths = options.config and (options.config,) or CONFIG_FILES
+    for path in filter(os.path.exists, map(os.path.expanduser, config_paths)):
+        config.load(path)
+        break
+
+    config_args = config.section_to_args("ds4drv") + config.controllers()
+    config_options = parser.parse_args(config_args)
+
+    defaults, remaining_args = parser.parse_known_args(["--next-controller"])
+    merge_options(config_options, options, defaults)
+
+    controller_defaults = ControllerAction.default_controller()
+    for idx, controller in enumerate(config_options.controllers):
+        try:
+            org_controller = options.controllers[idx]
+            merge_options(controller, org_controller, controller_defaults)
+        except IndexError:
+            options.controllers.append(controller)
+
+    return options
+
+
+def main():
+    options = load_options()
 
     if options.hidraw:
         backend = HidrawBackend(Daemon.logger)
