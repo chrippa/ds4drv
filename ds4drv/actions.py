@@ -4,6 +4,11 @@ BATTERY_MAX          = 8
 BATTERY_MAX_CHARGING = 11
 BATTERY_WARNING      = 2
 
+# Map which button combinations trigger commands
+COMMAND_MAPPING = {
+    "toggle_mouse": ["button_l2", "button_r2", "button_ps", "button_trackpad"]
+}
+
 
 class ReportTimer(object):
     def __init__(self, interval):
@@ -104,3 +109,29 @@ class ReportActionStatus(ReportAction):
         self.report = report
 
         return True
+
+
+class ReportActionCommand(ReportAction):
+    def __init__(self, device, controller):
+        super(ReportActionCommand, self).__init__(device, controller)
+
+        self.active_commands = set()
+
+    def handle_report(self, report):
+        for command, buttons in COMMAND_MAPPING.items():
+            triggered = True
+            for button in buttons:
+                triggered = triggered and getattr(report, button)
+
+            active = command in self.active_commands
+
+            if triggered and not active:
+                self._handle_command(command)
+                self.active_commands.add(command)
+            elif not triggered and active:
+                self.active_commands.remove(command)
+
+    def _handle_command(self, command):
+        if command == "toggle_mouse":
+            mouse = self.controller.joystick.toggle_mouse() and "Enabled" or "Disabled"
+            self.controller.logger.info("Trackpad mouse: {0}".format(mouse))
