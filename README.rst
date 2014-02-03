@@ -2,7 +2,7 @@
 ds4drv
 ======
 
-ds4drv is a userspace Linux driver for the Sony DualShock 4 controller.
+ds4drv is a Sony DualShock 4 userspace driver for Linux.
 
 
 Background
@@ -33,7 +33,7 @@ released which contains support for the DS4. This project is therefore only usef
 if you want to access any features not yet supported by the Linux kernel, such as LED
 color or trackpad mouse.
 
-**Update (2014-01-29):** ds4drv can now handle USB devices when used with
+**Update (2014-01-29):** ds4drv (git version) can now handle USB devices when used with
 ``--hidraw``. In addition, the hidraw backend supports using paired Bluetooth
 devices, but the Linux kernel currently does not allow sending correct reports
 to DualShock 4 controllers. This may change in the future enabling Bluetooth
