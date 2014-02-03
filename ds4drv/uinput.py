@@ -4,15 +4,20 @@ from collections import namedtuple
 
 from evdev import UInput, UInputError, ecodes
 
-from .exceptions import JoystickError
+from .exceptions import DeviceError
 
-JoystickLayout = namedtuple("JoystickLayout",
+UInputMapping = namedtuple("UInputMapping",
                             "name bustype vendor product version "
-                            "axes axes_options buttons hats")
+                            "axes axes_options buttons hats keys mouse")
 
 
-JOYSTICK_LAYOUTS = {
-    "ds4": JoystickLayout(
+def create_mapping(name, bustype=0, vendor=0, product=0, version=0, axes={},
+                   axes_options={}, buttons={}, hats={}, keys={}, mouse={}):
+    return UInputMapping(name, bustype, vendor, product, version, axes,
+                         axes_options, buttons, hats, keys, mouse)
+
+MAPPINGS = {
+    "ds4": create_mapping(
         "Sony Computer Entertainment Wireless Controller",
         # Bus type,     vendor, product, version
         ecodes.BUS_USB, 1356,   1476,    273,
@@ -64,7 +69,7 @@ JOYSTICK_LAYOUTS = {
         }
     ),
 
-    "xboxdrv": JoystickLayout(
+    "xboxdrv": create_mapping(
         "Xbox Gamepad (userspace driver)",
         # Bus type, vendor, product, version
         0,          0,      0,       0,
@@ -100,7 +105,7 @@ JOYSTICK_LAYOUTS = {
         }
     ),
 
-    "xpad": JoystickLayout(
+    "xpad": create_mapping(
         "Microsoft X-Box 360 pad",
         # Bus type,      vendor, product, version
         ecodes.BUS_USB,  1118,   654,     272,
@@ -136,7 +141,7 @@ JOYSTICK_LAYOUTS = {
         }
     ),
 
-    "xpad_wireless": JoystickLayout(
+    "xpad_wireless": create_mapping(
         "Xbox 360 Wireless Receiver",
         # Bus type,      vendor, product, version
         ecodes.BUS_USB,  1118,   1817,    256,
@@ -170,10 +175,19 @@ JOYSTICK_LAYOUTS = {
             "BTN_TRIGGER_HAPPY3": "dpad_up",
             "BTN_TRIGGER_HAPPY4": "dpad_down",
         },
-        # Hats
-        {}
+    ),
+    "mouse": create_mapping(
+        "DualShock4 Mouse Emulation",
+        buttons={
+            "BTN_LEFT": "button_trackpad",
+        },
+        mouse={
+            "REL_X":    "trackpad_touch0_x",
+            "REL_Y":    "trackpad_touch0_y"
+        },
     )
 }
+
 
 def next_joystick_device():
     for i in range(100):
@@ -183,13 +197,10 @@ def next_joystick_device():
 
 
 class UInputDevice(object):
-    def __init__(self, layout, mouse=False):
-        self.mouse = None
-        self.jsdev = next_joystick_device()
-        self.create_joystick(layout)
-
-        if mouse:
-            self.create_mouse()
+    def __init__(self, layout):
+        self.joystick_dev = None
+        self.evdev_dev = None
+        self.create_device(layout)
 
     def create_mouse(self):
         events = {
@@ -199,8 +210,13 @@ class UInputDevice(object):
         self.mouse = UInput(events)
         self.mouse_pos = None
 
-    def create_joystick(self, layout):
-        events = {ecodes.EV_ABS: [], ecodes.EV_KEY: []}
+    def create_device(self, layout):
+        events = {ecodes.EV_ABS: [], ecodes.EV_KEY: [],
+                  ecodes.EV_REL: []}
+
+        # Joystick device
+        if layout.axes or layout.buttons or layout.hats:
+            self.joystick_dev = next_joystick_device()
 
         for name in layout.axes:
             key = getattr(ecodes, name)
@@ -215,28 +231,26 @@ class UInputDevice(object):
         for name in layout.buttons:
             events[ecodes.EV_KEY].append(getattr(ecodes, name))
 
-        self.joystick = UInput(name=layout.name, events=events,
-                               bustype=layout.bustype, vendor=layout.vendor,
-                               product=layout.product, version=layout.version)
+        if layout.mouse:
+            self.mouse_pos = {}
+            for name in layout.mouse:
+                events[ecodes.EV_REL].append(getattr(ecodes, name))
+
+        self.device = UInput(name=layout.name, events=events,
+                             bustype=layout.bustype, vendor=layout.vendor,
+                             product=layout.product, version=layout.version)
         self.layout = layout
 
     def emit(self, report):
-        self.emit_joystick(report)
-
-        if self.mouse:
-            self.emit_mouse(report)
-
-    def emit_joystick(self, report):
         for name, attr in self.layout.axes.items():
             name = getattr(ecodes, name)
             value = getattr(report, attr)
-
-            self.joystick.write(ecodes.EV_ABS, name, value)
+            self.device.write(ecodes.EV_ABS, name, value)
 
         for name, attr in self.layout.buttons.items():
             name = getattr(ecodes, name)
             value = getattr(report, attr)
-            self.joystick.write(ecodes.EV_KEY, name, value)
+            self.device.write(ecodes.EV_KEY, name, value)
 
         for name, attr in self.layout.hats.items():
             name = getattr(ecodes, name)
@@ -247,40 +261,41 @@ class UInputDevice(object):
             else:
                 value = 0
 
-            self.joystick.write(ecodes.EV_ABS, name, value)
+            self.device.write(ecodes.EV_ABS, name, value)
 
-        self.joystick.syn()
+        if self.layout.mouse:
+            self.emit_mouse(report)
+
+        self.device.syn()
 
     def emit_mouse(self, report):
-        if report.trackpad_touch0_active:
-            if not self.mouse_pos:
-                self.mouse_pos = (report.trackpad_touch0_x,
-                                  report.trackpad_touch0_y)
+        for name, attr in self.layout.mouse.items():
+            if attr.startswith("trackpad_touch"):
+                active_attr = attr[:16] + "active"
+                if not getattr(report, active_attr):
+                    self.mouse_pos.pop(name, None)
+                    continue
+
+            pos = getattr(report, attr)
+            if name not in self.mouse_pos:
+                self.mouse_pos[name] = pos
 
             sensitivity = 0.5
-            rel_x = (report.trackpad_touch0_x - self.mouse_pos[0]) * sensitivity
-            rel_y = (report.trackpad_touch0_y - self.mouse_pos[1]) * sensitivity
-
-            self.mouse.write(ecodes.EV_REL, ecodes.REL_X, int(rel_x))
-            self.mouse.write(ecodes.EV_REL, ecodes.REL_Y, int(rel_y))
-            self.mouse_pos = (report.trackpad_touch0_x, report.trackpad_touch0_y)
-        else:
-            self.mouse_pos = None
-
-        self.mouse.write(ecodes.EV_KEY, ecodes.BTN_LEFT,
-                         int(report.button_trackpad))
-        self.mouse.syn()
+            rel = (pos - self.mouse_pos[name]) * sensitivity
+            self.device.write(ecodes.EV_REL, getattr(ecodes, name), int(rel))
+            self.mouse_pos[name] = pos
 
 
-def create_joystick(layout, mouse=False):
-    layout = JOYSTICK_LAYOUTS.get(layout)
+def create_uinput_device(mapping):
+    if mapping not in MAPPINGS:
+        raise DeviceError("Unknown device mapping: {0}".format(mapping))
 
-    if not layout:
-        raise JoystickError("Unknown joystick layout: {0}", layout)
 
     try:
-        joystick = UInputDevice(layout, mouse=mouse)
+        mapping = MAPPINGS[mapping]
+        device = UInputDevice(mapping)
     except UInputError as err:
-        raise JoystickError(err)
+        raise DeviceError(err)
 
-    return joystick
+    return device
+

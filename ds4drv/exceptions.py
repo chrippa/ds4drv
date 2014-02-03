@@ -4,6 +4,3 @@ class BackendError(Exception):
 class DeviceError(Exception):
     pass
 
-class JoystickError(Exception):
-    pass
-

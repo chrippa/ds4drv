@@ -50,9 +50,10 @@ class ReportActionBattery(ReportAction):
         return True
 
 
-class ReportActionJoystick(ReportAction):
+class ReportActionInput(ReportAction):
     def handle_report(self, report):
-        self.controller.joystick.emit(report)
+        for input in self.controller.inputs:
+            input.emit(report)
 
 
 class ReportActionStatus(ReportAction):

@@ -6,13 +6,13 @@ from collections import namedtuple
 from threading import Thread
 
 from . import __version__
-from .actions import (ReportActionBattery, ReportActionJoystick,
+from .actions import (ReportActionBattery, ReportActionInput,
                       ReportActionStatus)
 from .backends import BluetoothBackend, HidrawBackend
 from .config import Config
 from .daemon import Daemon
-from .exceptions import BackendError, JoystickError
-from .joystick import create_joystick
+from .exceptions import BackendError, DeviceError
+from .uinput import create_uinput_device
 
 
 CONFIG_FILES = ("~/.config/ds4drv.conf", "/etc/ds4drv.conf")
@@ -20,7 +20,7 @@ DAEMON_LOG_FILE = "~/.cache/ds4drv.log"
 DAEMON_PID_FILE = "/tmp/ds4drv.pid"
 
 DS4Controller = namedtuple("DS4Controller",
-                           "id joystick options dynamic logger")
+                           "id inputs options dynamic logger")
 
 
 class ControllerAction(argparse.Action):
@@ -127,15 +127,20 @@ def create_controller(index, options, dynamic=False):
     else:
         layout = "ds4"
 
+    inputs = []
     try:
-        joystick = create_joystick(layout, mouse=options.trackpad_mouse)
-    except JoystickError as err:
-        Daemon.exit("Failed to create joystick device: {0}", err)
+        joystick = create_uinput_device(layout)
+        inputs.append(joystick)
+
+        if options.trackpad_mouse:
+            inputs.append(create_uinput_device("mouse"))
+    except DeviceError as err:
+        Daemon.exit("Failed to create input device: {0}", err)
 
     logger = Daemon.logger.new_module("controller {0}".format(index))
-    controller = DS4Controller(index, joystick, options, dynamic, logger)
+    controller = DS4Controller(index, inputs, options, dynamic, logger)
     controller.logger.info("Created devices {0} (joystick) {1} (evdev)",
-                           joystick.jsdev, joystick.joystick.device.fn)
+                           joystick.joystick_dev, joystick.device.device.fn)
 
     return controller
 
@@ -144,7 +149,7 @@ def read_device(device, controller):
     device.set_led(*controller.options.led)
 
     actions = [cls(device, controller) for cls in
-               (ReportActionJoystick, ReportActionStatus)]
+               (ReportActionInput, ReportActionStatus)]
 
     if controller.options.battery_flash:
         actions.append(ReportActionBattery(device, controller))
