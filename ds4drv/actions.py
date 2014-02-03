@@ -20,8 +20,7 @@ class ReportTimer(object):
 
 
 class ReportAction(object):
-    def __init__(self, device, controller):
-        self.device = device
+    def __init__(self, controller):
         self.controller = controller
         self.timers = {}
 
@@ -37,28 +36,28 @@ class ReportAction(object):
 
 
 class ReportActionBattery(ReportAction):
-    def __init__(self, device, controller):
-        super(ReportActionBattery, self).__init__(device, controller)
+    def __init__(self, controller):
+        super(ReportActionBattery, self).__init__(controller)
 
         self.add_timer(60, self.check_battery)
 
     def check_battery(self, report):
         if report.battery < BATTERY_WARNING and not report.plug_usb:
-            self.device.start_led_flash(30, 30)
-            self.add_timer(5, lambda r: self.device.stop_led_flash())
+            self.controller.device.start_led_flash(30, 30)
+            self.add_timer(5, lambda r: self.controller.device.stop_led_flash())
 
         return True
 
 
 class ReportActionInput(ReportAction):
     def handle_report(self, report):
-        for input in self.controller.inputs:
+        for name, input in self.controller.inputs.items():
             input.emit(report)
 
 
 class ReportActionStatus(ReportAction):
-    def __init__(self, device, controller):
-        super(ReportActionStatus, self).__init__(device, controller)
+    def __init__(self, controller):
+        super(ReportActionStatus, self).__init__(controller)
 
         self.report = None
         self.add_timer(1, self.check_status)

@@ -2,7 +2,6 @@ import argparse
 import os
 import sys
 
-from collections import namedtuple
 from threading import Thread
 
 from . import __version__
@@ -18,9 +17,76 @@ from .uinput import create_uinput_device
 CONFIG_FILES = ("~/.config/ds4drv.conf", "/etc/ds4drv.conf")
 DAEMON_LOG_FILE = "~/.cache/ds4drv.log"
 DAEMON_PID_FILE = "/tmp/ds4drv.pid"
+DEFAULT_ACTIONS = (ReportActionInput, ReportActionStatus)
 
-DS4Controller = namedtuple("DS4Controller",
-                           "id inputs options dynamic logger")
+
+class DS4Controller(object):
+    def __init__(self, index, options, dynamic=False):
+        self.index = index
+        self.dynamic = dynamic
+        self.logger = Daemon.logger.new_module("controller {0}".format(index))
+
+        self.actions = [cls(self) for cls in DEFAULT_ACTIONS]
+        self.inputs = {}
+        self.joystick_layout = None
+
+        self.load_options(options)
+
+    def setup_device(self, device):
+        self.device = device
+        self.device.set_led(*self.options.led)
+
+    def load_options(self, options):
+        self.options = options
+
+        for action in self.actions:
+            if type(action) not in DEFAULT_ACTIONS:
+                self.actions.remove(action)
+
+        if options.battery_flash:
+            self.actions.append(ReportActionBattery(self))
+
+        try:
+            if self.options.emulate_xboxdrv:
+                joystick_layout = "xboxdrv"
+            elif self.options.emulate_xpad:
+                joystick_layout = "xpad"
+            elif self.options.emulate_xpad_wireless:
+                joystick_layout = "xpad_wireless"
+            else:
+                joystick_layout = "ds4"
+
+            if not self.inputs.get("mouse") and self.options.trackpad_mouse:
+                self.inputs["mouse"] = create_uinput_device("mouse")
+            elif self.inputs.get("mouse") and not self.options.trackpad_mouse:
+                self.inputs.pop("mouse", None)
+
+            if "joystick" in self.inputs and self.joystick_layout != joystick_layout:
+                self.inputs["joystick"].device.close()
+                joystick = create_uinput_device(joystick_layout)
+                self.inputs["joystick"] = joystick
+            elif "joystick" not in self.inputs:
+                joystick = create_uinput_device(joystick_layout)
+                self.inputs["joystick"] = joystick
+            else:
+                joystick = None
+
+            if joystick:
+                self.logger.info("Created devices {0} (joystick) {1} (evdev) ",
+                                 joystick.joystick_dev, joystick.device.device.fn)
+                self.joystick_layout = joystick_layout
+        except DeviceError as err:
+            Daemon.exit("Failed to create input device: {0}", err)
+
+    def read_device(self, device):
+        self.setup_device(device)
+
+        for report in self.device.reports:
+            for action in self.actions:
+                action.handle_report(report)
+
+        self.logger.info("Disconnected")
+        self.device.close()
 
 
 class ControllerAction(argparse.Action):
@@ -117,51 +183,6 @@ controllopt.add_argument("--next-controller", nargs=0, action=ControllerAction,
                          help="creates another controller")
 
 
-def create_controller(index, options, dynamic=False):
-    if options.emulate_xboxdrv:
-        layout = "xboxdrv"
-    elif options.emulate_xpad:
-        layout = "xpad"
-    elif options.emulate_xpad_wireless:
-        layout = "xpad_wireless"
-    else:
-        layout = "ds4"
-
-    inputs = []
-    try:
-        joystick = create_uinput_device(layout)
-        inputs.append(joystick)
-
-        if options.trackpad_mouse:
-            inputs.append(create_uinput_device("mouse"))
-    except DeviceError as err:
-        Daemon.exit("Failed to create input device: {0}", err)
-
-    logger = Daemon.logger.new_module("controller {0}".format(index))
-    controller = DS4Controller(index, inputs, options, dynamic, logger)
-    controller.logger.info("Created devices {0} (joystick) {1} (evdev)",
-                           joystick.joystick_dev, joystick.device.device.fn)
-
-    return controller
-
-
-def read_device(device, controller):
-    device.set_led(*controller.options.led)
-
-    actions = [cls(device, controller) for cls in
-               (ReportActionInput, ReportActionStatus)]
-
-    if controller.options.battery_flash:
-        actions.append(ReportActionBattery(device, controller))
-
-    for report in device.reports:
-        for action in actions:
-            action.handle_report(report)
-
-    controller.logger.info("Disconnected")
-    device.close()
-
-
 def merge_options(src, dst, defaults):
     for key, value in src.__dict__.items():
         if key == "controllers":
@@ -219,7 +240,7 @@ def main():
     threads = []
 
     for index, options in enumerate(options.controllers):
-        controller = create_controller(index + 1, options)
+        controller = DS4Controller(index + 1, options)
         controllers.append(controller)
 
     for device in backend.devices:
@@ -235,13 +256,13 @@ def main():
         if not controllers:
             index = len(threads) + 1
             options = ControllerAction.default_controller()
-            controller = create_controller(index, options, dynamic=True)
+            controller = DS4Controller(index, options, dynamic=True)
         else:
             controller = controllers.pop(0)
 
         controller.logger.info("Connected to {0}", device.name)
 
-        thread = Thread(target=read_device, args=(device, controller))
+        thread = Thread(target=controller.read_device, args=(device,))
         thread.daemon = True
         thread.controller = controller
         thread.start()
