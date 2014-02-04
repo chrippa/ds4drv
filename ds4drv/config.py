@@ -5,6 +5,7 @@ try:
 except ImportError:
     import configparser
 
+
 class Config(object):
     def __init__(self):
         self.config = configparser.SafeConfigParser()
@@ -51,4 +52,3 @@ class Config(object):
             args.append("--next-controller")
 
         return args
-

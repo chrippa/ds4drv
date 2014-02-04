@@ -7,8 +7,8 @@ from evdev import UInput, UInputError, ecodes
 from .exceptions import DeviceError
 
 UInputMapping = namedtuple("UInputMapping",
-                            "name bustype vendor product version "
-                            "axes axes_options buttons hats keys mouse")
+                           "name bustype vendor product version "
+                           "axes axes_options buttons hats keys mouse")
 
 
 def create_mapping(name, bustype=0, vendor=0, product=0, version=0, axes={},
@@ -200,6 +200,7 @@ class UInputDevice(object):
     def __init__(self, layout):
         self.joystick_dev = None
         self.evdev_dev = None
+        self.ignored_buttons = set()
         self.create_device(layout)
 
     def create_mouse(self):
@@ -249,7 +250,10 @@ class UInputDevice(object):
 
         for name, attr in self.layout.buttons.items():
             name = getattr(ecodes, name)
-            value = getattr(report, attr)
+            if attr in self.ignored_buttons:
+                value = False
+            else:
+                value = getattr(report, attr)
             self.device.write(ecodes.EV_KEY, name, value)
 
         for name, attr in self.layout.hats.items():
@@ -290,7 +294,6 @@ def create_uinput_device(mapping):
     if mapping not in MAPPINGS:
         raise DeviceError("Unknown device mapping: {0}".format(mapping))
 
-
     try:
         mapping = MAPPINGS[mapping]
         device = UInputDevice(mapping)
@@ -298,4 +301,3 @@ def create_uinput_device(mapping):
         raise DeviceError(err)
 
     return device
-

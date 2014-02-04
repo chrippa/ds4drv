@@ -10,4 +10,3 @@ class Backend(object):
     @property
     def devices(self):
         raise NotImplementedError
-

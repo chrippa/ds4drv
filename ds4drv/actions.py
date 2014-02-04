@@ -1,5 +1,6 @@
 from time import time
 
+
 BATTERY_MAX          = 8
 BATTERY_MAX_CHARGING = 11
 BATTERY_WARNING      = 2
@@ -47,6 +48,28 @@ class ReportActionBattery(ReportAction):
             self.add_timer(5, lambda r: self.controller.device.stop_led_flash())
 
         return True
+
+
+class ReportActionBinding(ReportAction):
+    def __init__(self, controller):
+        super(ReportActionBinding, self).__init__(controller)
+
+        self.bindings = {}
+        self.active = set()
+
+    def add_binding(self, combo, action):
+        self.bindings[combo] = action
+
+    def handle_report(self, report):
+        for combo, action in self.bindings.items():
+            active = all(getattr(report, button) for button in combo)
+            released = not any(getattr(report, button) for button in combo)
+
+            if active and combo not in self.active:
+                self.active.add(combo)
+            elif released and combo in self.active:
+                action()
+                self.active.remove(combo)
 
 
 class ReportActionInput(ReportAction):

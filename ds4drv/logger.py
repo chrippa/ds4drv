@@ -2,8 +2,10 @@ import sys
 
 from threading import Lock
 
+
 LEVELS = ["none", "error", "warning", "info"]
 FORMAT = "[{level}][{module}] {msg}\n"
+
 
 class Logger(object):
     def __init__(self):

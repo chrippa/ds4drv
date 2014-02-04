@@ -2,22 +2,24 @@ import argparse
 import os
 import sys
 
+from itertools import cycle
 from threading import Thread
 
 from . import __version__
-from .actions import (ReportActionBattery, ReportActionInput,
-                      ReportActionStatus)
+from .actions import (ReportActionBattery, ReportActionBinding,
+                      ReportActionInput, ReportActionStatus)
 from .backends import BluetoothBackend, HidrawBackend
 from .config import Config
 from .daemon import Daemon
 from .exceptions import BackendError, DeviceError
 from .uinput import create_uinput_device
+from .utils import parse_button_combo as buttoncombo
 
 
 CONFIG_FILES = ("~/.config/ds4drv.conf", "/etc/ds4drv.conf")
 DAEMON_LOG_FILE = "~/.cache/ds4drv.log"
 DAEMON_PID_FILE = "/tmp/ds4drv.pid"
-DEFAULT_ACTIONS = (ReportActionInput, ReportActionStatus)
+DEFAULT_ACTIONS = (ReportActionBinding, ReportActionInput, ReportActionStatus)
 
 
 class DS4Controller(object):
@@ -27,10 +29,33 @@ class DS4Controller(object):
         self.logger = Daemon.logger.new_module("controller {0}".format(index))
 
         self.actions = [cls(self) for cls in DEFAULT_ACTIONS]
+        self.device = None
+        self.default_profile = options
         self.inputs = {}
+        self.profile_iterator = None
         self.joystick_layout = None
 
+        if options.profiles and options.profile_toggle:
+            self.profile_iterator = self.create_profile_iterator(options)
+            self.actions[0].add_binding(options.profile_toggle,
+                                        lambda: next(self.profile_iterator))
+
         self.load_options(options)
+
+    def create_profile_iterator(self, options):
+        profiles = dict(options.parent.profiles)
+        profiles["default"] = options
+
+        for next_profile in cycle(options.profiles + ["default"]):
+            next_profile_options = profiles.get(next_profile)
+            if next_profile_options:
+                self.logger.info("Switching to profile: {0}", next_profile)
+                self.load_options(next_profile_options)
+            else:
+                self.logger.warning("Ignoring invalid profile: {0}",
+                                    next_profile)
+
+            yield
 
     def setup_device(self, device):
         self.device = device
@@ -59,6 +84,7 @@ class DS4Controller(object):
             if not self.inputs.get("mouse") and self.options.trackpad_mouse:
                 self.inputs["mouse"] = create_uinput_device("mouse")
             elif self.inputs.get("mouse") and not self.options.trackpad_mouse:
+                self.inputs["mouse"].device.close()
                 self.inputs.pop("mouse", None)
 
             if "joystick" in self.inputs and self.joystick_layout != joystick_layout:
@@ -68,15 +94,26 @@ class DS4Controller(object):
             elif "joystick" not in self.inputs:
                 joystick = create_uinput_device(joystick_layout)
                 self.inputs["joystick"] = joystick
+                self.logger.info("Created devices {0} (joystick) {1} (evdev) ",
+                                 joystick.joystick_dev, joystick.device.device.fn)
             else:
                 joystick = None
 
             if joystick:
-                self.logger.info("Created devices {0} (joystick) {1} (evdev) ",
-                                 joystick.joystick_dev, joystick.device.device.fn)
                 self.joystick_layout = joystick_layout
+
+                # If the profile binding is a single button we don't want to
+                # send it to the joystick at all
+                if (self.profile_iterator and
+                    len(self.default_profile.profile_toggle) == 1):
+                    button = self.default_profile.profile_toggle[0]
+                    self.inputs["joystick"].ignored_buttons.add(button)
+
         except DeviceError as err:
             Daemon.exit("Failed to create input device: {0}", err)
+
+        if self.device:
+            self.setup_device(self.device)
 
     def read_device(self, device):
         self.setup_device(device)
@@ -91,7 +128,8 @@ class DS4Controller(object):
 
 class ControllerAction(argparse.Action):
     __options__ = ["battery_flash", "emulate_xboxdrv", "emulate_xpad",
-                   "emulate_xpad_wireless", "led", "trackpad_mouse"]
+                   "emulate_xpad_wireless", "led", "profile_toggle",
+                   "profiles", "trackpad_mouse"]
 
     @classmethod
     def default_controller(cls):
@@ -136,6 +174,10 @@ def hexcolor(color):
     return tuple(values)
 
 
+def stringlist(s):
+    return list(filter(None, map(str.strip, s.split(","))))
+
+
 parser = argparse.ArgumentParser(prog="ds4drv")
 parser.add_argument("--version", action="version",
                     version="%(prog)s {0}".format(__version__))
@@ -172,11 +214,19 @@ controllopt.add_argument("--emulate-xpad", action="store_true",
 controllopt.add_argument("--emulate-xpad-wireless", action="store_true",
                          help="emulates the same joystick layout as a wireless "
                               "Xbox 360 controller used via the xpad module")
-
 controllopt.add_argument("--led", metavar="color", default="0000ff",
                          type=hexcolor,
                          help="sets color of the LED. Uses hex color codes, "
                               "e.g. 'ff0000' is red. Default is '0000ff' (blue)")
+controllopt.add_argument("--profile-toggle", metavar="button(s)",
+                         type=buttoncombo,
+                         help="a button combo that will trigger profile "
+                              "cycling, e.g. 'R1+L1+PS'")
+controllopt.add_argument("--profiles", metavar="profiles",
+                         type=stringlist,
+                         help="profiles to cycle through using the button "
+                              "specified by --profile-toggle, e.g. "
+                              "'profile1,profile2'")
 controllopt.add_argument("--trackpad-mouse", action="store_true",
                          help="makes the trackpad control the mouse")
 controllopt.add_argument("--next-controller", nargs=0, action=ControllerAction,
@@ -216,6 +266,16 @@ def load_options():
             merge_options(controller, org_controller, controller_defaults)
         except IndexError:
             options.controllers.append(controller)
+
+    options.profiles = {}
+    for name, section in config.sections("profile"):
+        args = config.section_to_args(section)
+        profile_options = parser.parse_args(args)
+        profile_options.parent = options
+        options.profiles[name] = profile_options
+
+    for controller in options.controllers:
+        controller.parent = options
 
     return options
 
