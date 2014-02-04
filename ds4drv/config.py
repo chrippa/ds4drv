@@ -30,6 +30,9 @@ class Config(object):
 
         return args
 
+    def section(self, section):
+        return dict(self.config.items(section))
+
     def sections(self, prefix):
         for section in self.config.sections():
             match = re.match(r"{0}:(.+)".format(prefix), section)

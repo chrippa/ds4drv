@@ -6,194 +6,193 @@ from evdev import UInput, UInputError, ecodes
 
 from .exceptions import DeviceError
 
+
 UInputMapping = namedtuple("UInputMapping",
                            "name bustype vendor product version "
                            "axes axes_options buttons hats keys mouse")
 
-
-def create_mapping(name, bustype=0, vendor=0, product=0, version=0, axes={},
-                   axes_options={}, buttons={}, hats={}, keys={}, mouse={}):
-    return UInputMapping(name, bustype, vendor, product, version, axes,
-                         axes_options, buttons, hats, keys, mouse)
-
-MAPPINGS = {
-    "ds4": create_mapping(
-        "Sony Computer Entertainment Wireless Controller",
-        # Bus type,     vendor, product, version
-        ecodes.BUS_USB, 1356,   1476,    273,
-        # Axes
-        {
-            "ABS_X":        "left_analog_x",
-            "ABS_Y":        "left_analog_y",
-            "ABS_Z":        "right_analog_x",
-            "ABS_RZ":       "right_analog_y",
-            "ABS_RX":       "l2_analog",
-            "ABS_RY":       "r2_analog",
-            "ABS_THROTTLE": "orientation_roll",
-            "ABS_RUDDER":   "orientation_pitch",
-            "ABS_WHEEL":    "orientation_yaw",
-            "ABS_DISTANCE": "motion_z",
-            "ABS_TILT_X":   "motion_x",
-            "ABS_TILT_Y":   "motion_y",
-        },
-        # Axes options
-        {
-            "ABS_THROTTLE": (-16385, 16384, 0, 0),
-            "ABS_RUDDER":   (-16385, 16384, 0, 0),
-            "ABS_WHEEL":    (-16385, 16384, 0, 0),
-            "ABS_DISTANCE": (-32768, 32767, 0, 10),
-            "ABS_TILT_X":   (-32768, 32767, 0, 10),
-            "ABS_TILT_Y":   (-32768, 32767, 0, 10),
-        },
-        # Buttons
-        {
-            "BTN_TR2":    "button_options",
-            "BTN_MODE":   "button_ps",
-            "BTN_TL2":    "button_share",
-            "BTN_B":      "button_cross",
-            "BTN_C":      "button_circle",
-            "BTN_A":      "button_square",
-            "BTN_X":      "button_triangle",
-            "BTN_Y":      "button_l1",
-            "BTN_Z":      "button_r1",
-            "BTN_TL":     "button_l2",
-            "BTN_TR":     "button_r2",
-            "BTN_SELECT": "button_l3",
-            "BTN_START":  "button_r3",
-            "BTN_THUMBL": "button_trackpad"
-        },
-        # Hats
-        {
-            "ABS_HAT0X": ("dpad_left", "dpad_right"),
-            "ABS_HAT0Y": ("dpad_up", "dpad_down")
-        }
-    ),
-
-    "xboxdrv": create_mapping(
-        "Xbox Gamepad (userspace driver)",
-        # Bus type, vendor, product, version
-        0,          0,      0,       0,
-        # Axes
-        {
-            "ABS_X":     "left_analog_x",
-            "ABS_Y":     "left_analog_y",
-            "ABS_RX":    "right_analog_x",
-            "ABS_RY":    "right_analog_y",
-            "ABS_BRAKE": "l2_analog",
-            "ABS_GAS":   "r2_analog"
-        },
-        # Axes settings
-        {},
-        #Buttons
-        {
-            "BTN_START":  "button_options",
-            "BTN_MODE":   "button_ps",
-            "BTN_SELECT": "button_share",
-            "BTN_A":      "button_cross",
-            "BTN_B":      "button_circle",
-            "BTN_X":      "button_square",
-            "BTN_Y":      "button_triangle",
-            "BTN_TL":     "button_l1",
-            "BTN_TR":     "button_r1",
-            "BTN_THUMBL": "button_l3",
-            "BTN_THUMBR": "button_r3"
-        },
-        # Hats
-        {
-            "ABS_HAT0X": ("dpad_left", "dpad_right"),
-            "ABS_HAT0Y": ("dpad_up", "dpad_down")
-        }
-    ),
-
-    "xpad": create_mapping(
-        "Microsoft X-Box 360 pad",
-        # Bus type,      vendor, product, version
-        ecodes.BUS_USB,  1118,   654,     272,
-        # Axes
-        {
-            "ABS_X":  "left_analog_x",
-            "ABS_Y":  "left_analog_y",
-            "ABS_RX": "right_analog_x",
-            "ABS_RY": "right_analog_y",
-            "ABS_Z":  "l2_analog",
-            "ABS_RZ": "r2_analog"
-        },
-        # Axes settings
-        {},
-        #Buttons
-        {
-            "BTN_START":  "button_options",
-            "BTN_MODE":   "button_ps",
-            "BTN_SELECT": "button_share",
-            "BTN_A":      "button_cross",
-            "BTN_B":      "button_circle",
-            "BTN_X":      "button_square",
-            "BTN_Y":      "button_triangle",
-            "BTN_TL":     "button_l1",
-            "BTN_TR":     "button_r1",
-            "BTN_THUMBL": "button_l3",
-            "BTN_THUMBR": "button_r3"
-        },
-        # Hats
-        {
-            "ABS_HAT0X": ("dpad_left", "dpad_right"),
-            "ABS_HAT0Y": ("dpad_up", "dpad_down")
-        }
-    ),
-
-    "xpad_wireless": create_mapping(
-        "Xbox 360 Wireless Receiver",
-        # Bus type,      vendor, product, version
-        ecodes.BUS_USB,  1118,   1817,    256,
-        # Axes
-        {
-            "ABS_X":  "left_analog_x",
-            "ABS_Y":  "left_analog_y",
-            "ABS_RX": "right_analog_x",
-            "ABS_RY": "right_analog_y",
-            "ABS_Z":  "l2_analog",
-            "ABS_RZ": "r2_analog"
-        },
-        # Axes settings
-        {},
-        #Buttons
-        {
-            "BTN_START":  "button_options",
-            "BTN_MODE":   "button_ps",
-            "BTN_SELECT": "button_share",
-            "BTN_A":      "button_cross",
-            "BTN_B":      "button_circle",
-            "BTN_X":      "button_square",
-            "BTN_Y":      "button_triangle",
-            "BTN_TL":     "button_l1",
-            "BTN_TR":     "button_r1",
-            "BTN_THUMBL": "button_l3",
-            "BTN_THUMBR": "button_r3",
-
-            "BTN_TRIGGER_HAPPY1": "dpad_left",
-            "BTN_TRIGGER_HAPPY2": "dpad_right",
-            "BTN_TRIGGER_HAPPY3": "dpad_up",
-            "BTN_TRIGGER_HAPPY4": "dpad_down",
-        },
-    ),
-    "mouse": create_mapping(
-        "DualShock4 Mouse Emulation",
-        buttons={
-            "BTN_LEFT": "button_trackpad",
-        },
-        mouse={
-            "REL_X":    "trackpad_touch0_x",
-            "REL_Y":    "trackpad_touch0_y"
-        },
-    )
-}
+_mappings = {}
 
 
-def next_joystick_device():
-    for i in range(100):
-        dev = "/dev/input/js{0}".format(i)
-        if not os.path.exists(dev):
-            return dev
+def create_mapping(name, description, bustype=0, vendor=0, product=0,
+                   version=0, axes={}, axes_options={}, buttons={},
+                   hats={}, keys={}, mouse={}):
+    mapping = UInputMapping(description, bustype, vendor, product, version,
+                            axes, axes_options, buttons, hats, keys, mouse)
+    _mappings[name] = mapping
+
+
+# Pre-configued mappings
+create_mapping(
+    "ds4", "Sony Computer Entertainment Wireless Controller",
+    # Bus type,     vendor, product, version
+    ecodes.BUS_USB, 1356,   1476,    273,
+    # Axes
+    {
+        "ABS_X":        "left_analog_x",
+        "ABS_Y":        "left_analog_y",
+        "ABS_Z":        "right_analog_x",
+        "ABS_RZ":       "right_analog_y",
+        "ABS_RX":       "l2_analog",
+        "ABS_RY":       "r2_analog",
+        "ABS_THROTTLE": "orientation_roll",
+        "ABS_RUDDER":   "orientation_pitch",
+        "ABS_WHEEL":    "orientation_yaw",
+        "ABS_DISTANCE": "motion_z",
+        "ABS_TILT_X":   "motion_x",
+        "ABS_TILT_Y":   "motion_y",
+    },
+    # Axes options
+    {
+        "ABS_THROTTLE": (-16385, 16384, 0, 0),
+        "ABS_RUDDER":   (-16385, 16384, 0, 0),
+        "ABS_WHEEL":    (-16385, 16384, 0, 0),
+        "ABS_DISTANCE": (-32768, 32767, 0, 10),
+        "ABS_TILT_X":   (-32768, 32767, 0, 10),
+        "ABS_TILT_Y":   (-32768, 32767, 0, 10),
+    },
+    # Buttons
+    {
+        "BTN_TR2":    "button_options",
+        "BTN_MODE":   "button_ps",
+        "BTN_TL2":    "button_share",
+        "BTN_B":      "button_cross",
+        "BTN_C":      "button_circle",
+        "BTN_A":      "button_square",
+        "BTN_X":      "button_triangle",
+        "BTN_Y":      "button_l1",
+        "BTN_Z":      "button_r1",
+        "BTN_TL":     "button_l2",
+        "BTN_TR":     "button_r2",
+        "BTN_SELECT": "button_l3",
+        "BTN_START":  "button_r3",
+        "BTN_THUMBL": "button_trackpad"
+    },
+    # Hats
+    {
+        "ABS_HAT0X": ("dpad_left", "dpad_right"),
+        "ABS_HAT0Y": ("dpad_up", "dpad_down")
+    }
+)
+
+create_mapping(
+    "xboxdrv", "Xbox Gamepad (userspace driver)",
+    # Bus type, vendor, product, version
+    0,          0,      0,       0,
+    # Axes
+    {
+        "ABS_X":     "left_analog_x",
+        "ABS_Y":     "left_analog_y",
+        "ABS_RX":    "right_analog_x",
+        "ABS_RY":    "right_analog_y",
+        "ABS_BRAKE": "l2_analog",
+        "ABS_GAS":   "r2_analog"
+    },
+    # Axes settings
+    {},
+    #Buttons
+    {
+        "BTN_START":  "button_options",
+        "BTN_MODE":   "button_ps",
+        "BTN_SELECT": "button_share",
+        "BTN_A":      "button_cross",
+        "BTN_B":      "button_circle",
+        "BTN_X":      "button_square",
+        "BTN_Y":      "button_triangle",
+        "BTN_TL":     "button_l1",
+        "BTN_TR":     "button_r1",
+        "BTN_THUMBL": "button_l3",
+        "BTN_THUMBR": "button_r3"
+    },
+    # Hats
+    {
+        "ABS_HAT0X": ("dpad_left", "dpad_right"),
+        "ABS_HAT0Y": ("dpad_up", "dpad_down")
+    }
+)
+
+create_mapping(
+    "xpad", "Microsoft X-Box 360 pad",
+    # Bus type,      vendor, product, version
+    ecodes.BUS_USB,  1118,   654,     272,
+    # Axes
+    {
+        "ABS_X":  "left_analog_x",
+        "ABS_Y":  "left_analog_y",
+        "ABS_RX": "right_analog_x",
+        "ABS_RY": "right_analog_y",
+        "ABS_Z":  "l2_analog",
+        "ABS_RZ": "r2_analog"
+    },
+    # Axes settings
+    {},
+    #Buttons
+    {
+        "BTN_START":  "button_options",
+        "BTN_MODE":   "button_ps",
+        "BTN_SELECT": "button_share",
+        "BTN_A":      "button_cross",
+        "BTN_B":      "button_circle",
+        "BTN_X":      "button_square",
+        "BTN_Y":      "button_triangle",
+        "BTN_TL":     "button_l1",
+        "BTN_TR":     "button_r1",
+        "BTN_THUMBL": "button_l3",
+        "BTN_THUMBR": "button_r3"
+    },
+    # Hats
+    {
+        "ABS_HAT0X": ("dpad_left", "dpad_right"),
+        "ABS_HAT0Y": ("dpad_up", "dpad_down")
+    }
+)
+
+create_mapping(
+    "xpad_wireless", "Xbox 360 Wireless Receiver",
+    # Bus type,      vendor, product, version
+    ecodes.BUS_USB,  1118,   1817,    256,
+    # Axes
+    {
+        "ABS_X":  "left_analog_x",
+        "ABS_Y":  "left_analog_y",
+        "ABS_RX": "right_analog_x",
+        "ABS_RY": "right_analog_y",
+        "ABS_Z":  "l2_analog",
+        "ABS_RZ": "r2_analog"
+    },
+    # Axes settings
+    {},
+    #Buttons
+    {
+        "BTN_START":  "button_options",
+        "BTN_MODE":   "button_ps",
+        "BTN_SELECT": "button_share",
+        "BTN_A":      "button_cross",
+        "BTN_B":      "button_circle",
+        "BTN_X":      "button_square",
+        "BTN_Y":      "button_triangle",
+        "BTN_TL":     "button_l1",
+        "BTN_TR":     "button_r1",
+        "BTN_THUMBL": "button_l3",
+        "BTN_THUMBR": "button_r3",
+
+        "BTN_TRIGGER_HAPPY1": "dpad_left",
+        "BTN_TRIGGER_HAPPY2": "dpad_right",
+        "BTN_TRIGGER_HAPPY3": "dpad_up",
+        "BTN_TRIGGER_HAPPY4": "dpad_down",
+    },
+)
+
+create_mapping(
+    "mouse", "DualShock4 Mouse Emulation",
+    buttons={
+        "BTN_LEFT": "button_trackpad",
+    },
+    mouse={
+        "REL_X": "trackpad_touch0_x",
+        "REL_Y": "trackpad_touch0_y"
+    },
+)
 
 
 class UInputDevice(object):
@@ -291,13 +290,38 @@ class UInputDevice(object):
 
 
 def create_uinput_device(mapping):
-    if mapping not in MAPPINGS:
+    if mapping not in _mappings:
         raise DeviceError("Unknown device mapping: {0}".format(mapping))
 
     try:
-        mapping = MAPPINGS[mapping]
+        mapping = _mappings[mapping]
         device = UInputDevice(mapping)
     except UInputError as err:
         raise DeviceError(err)
 
     return device
+
+
+def parse_uinput_mapping(name, mapping):
+    axes, buttons, mouse = {}, {}, {}
+    description = "ds4drv custom mapping ({0})".format(name)
+
+    for key, attr in mapping.items():
+        key = key.upper()
+        if key.startswith("BTN_") or key.startswith("KEY_"):
+            buttons[key] = attr
+        elif key.startswith("ABS_"):
+            axes[key] = attr
+        elif key.startswith("REL_"):
+            mouse[key] = attr
+
+    create_mapping(name, description, axes=axes, buttons=buttons,
+                   mouse=mouse)
+
+
+def next_joystick_device():
+    for i in range(100):
+        dev = "/dev/input/js{0}".format(i)
+        if not os.path.exists(dev):
+            return dev
+

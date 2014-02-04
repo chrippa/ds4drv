@@ -12,7 +12,7 @@ from .backends import BluetoothBackend, HidrawBackend
 from .config import Config
 from .daemon import Daemon
 from .exceptions import BackendError, DeviceError
-from .uinput import create_uinput_device
+from .uinput import create_uinput_device, parse_uinput_mapping
 from .utils import parse_button_combo as buttoncombo
 
 
@@ -72,7 +72,9 @@ class DS4Controller(object):
             self.actions.append(ReportActionBattery(self))
 
         try:
-            if self.options.emulate_xboxdrv:
+            if self.options.mapping:
+                joystick_layout = self.options.mapping
+            elif self.options.emulate_xboxdrv:
                 joystick_layout = "xboxdrv"
             elif self.options.emulate_xpad:
                 joystick_layout = "xpad"
@@ -94,8 +96,10 @@ class DS4Controller(object):
             elif "joystick" not in self.inputs:
                 joystick = create_uinput_device(joystick_layout)
                 self.inputs["joystick"] = joystick
-                self.logger.info("Created devices {0} (joystick) {1} (evdev) ",
-                                 joystick.joystick_dev, joystick.device.device.fn)
+                if joystick.device.device:
+                    self.logger.info("Created devices {0} (joystick) "
+                                     "{1} (evdev) ", joystick.joystick_dev,
+                                     joystick.device.device.fn)
             else:
                 joystick = None
 
@@ -128,8 +132,8 @@ class DS4Controller(object):
 
 class ControllerAction(argparse.Action):
     __options__ = ["battery_flash", "emulate_xboxdrv", "emulate_xpad",
-                   "emulate_xpad_wireless", "led", "profile_toggle",
-                   "profiles", "trackpad_mouse"]
+                   "emulate_xpad_wireless", "led", "mapping",
+                   "profile_toggle", "profiles", "trackpad_mouse"]
 
     @classmethod
     def default_controller(cls):
@@ -218,6 +222,9 @@ controllopt.add_argument("--led", metavar="color", default="0000ff",
                          type=hexcolor,
                          help="sets color of the LED. Uses hex color codes, "
                               "e.g. 'ff0000' is red. Default is '0000ff' (blue)")
+controllopt.add_argument("--mapping", metavar="mapping",
+                         help="use a custom button mapping specified in the "
+                              "config file")
 controllopt.add_argument("--profile-toggle", metavar="button(s)",
                          type=buttoncombo,
                          help="a button combo that will trigger profile "
@@ -273,6 +280,10 @@ def load_options():
         profile_options = parser.parse_args(args)
         profile_options.parent = options
         options.profiles[name] = profile_options
+
+    for name, section in config.sections("mapping"):
+        mapping = config.section(section)
+        parse_uinput_mapping(name, mapping)
 
     for controller in options.controllers:
         controller.parent = options
