@@ -1,7 +1,16 @@
 from collections import namedtuple
 from struct import Struct
 
-S16LE = Struct("<h")
+
+class StructHack(Struct):
+    """Python <2.7.4 doesn't support struct unpack from bytearray"""
+    def unpack(self, buf):
+        if isinstance(buf, bytearray):
+            buf = bytes(buf)
+
+        return Struct.unpack(self, buf)
+
+S16LE = StructHack("<h")
 
 DS4Report = namedtuple("DS4Report",
                        ["left_analog_x",
