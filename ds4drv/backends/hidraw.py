@@ -3,6 +3,7 @@ import itertools
 
 from evdev import InputDevice
 from pyudev import Context, Monitor
+from time import sleep
 
 from ..backend import Backend
 from ..exceptions import DeviceError
@@ -129,6 +130,11 @@ class HidrawBackend(Backend):
         self._scanning_log_message()
         for device in iter(monitor.poll, None):
             if device.action == "add":
+                # Sometimes udev rules has not been applied at this point,
+                # causing permission denied error if we are running in user
+                # mode. With this sleep this will hopefully not happen.
+                sleep(1)
+
                 yield device
                 self._scanning_log_message()
 
