@@ -4,8 +4,7 @@ Requires=bluetooth.service
 After=bluetooth.service
 
 [Service]
-EnvironmentFile=/etc/conf.d/ds4drv.conf
-ExecStart=/usr/bin/ds4drv $DS4DRV_OPTS
+ExecStart=/usr/bin/ds4drv
 Restart=on-abort
 
 [Install]
