@@ -62,6 +62,9 @@ class BluetoothDS4Device(DS4Device):
 
         self.ctl_sock.sendall(hid + data)
 
+    def set_operational(self):
+        self.set_led(255, 255, 255)
+
     def close(self):
         self.int_sock.close()
         self.ctl_sock.close()

@@ -67,7 +67,7 @@ class DS4Device(object):
         self._led_flash = (0, 0)
         self._led_flashing = False
 
-        self.set_led(255, 255, 255)
+        self.set_operational()
 
     def _control(self, **kwargs):
         self.control(led_red=self._led[0], led_green=self._led[1],
@@ -195,6 +195,9 @@ class DS4Device(object):
         pass
 
     def write_report(self, report_id, data):
+        pass
+
+    def set_operational(self):
         pass
 
     def close(self):

@@ -1,3 +1,4 @@
+import fcntl
 import itertools
 
 from evdev import InputDevice
@@ -7,6 +8,9 @@ from ..backend import Backend
 from ..exceptions import DeviceError
 from ..device import DS4Device
 from ..utils import zero_copy_slice
+
+
+HIDIOCGFEATURE_38 = 3223734279
 
 
 class HidrawDS4Device(DS4Device):
@@ -41,8 +45,12 @@ class HidrawDS4Device(DS4Device):
         raise NotImplementedError
 
     def write_report(self, report_id, data):
-        hid = bytearray((report_id,))
+        if self.type == "bluetooth":
+            # TODO: Add a check for a kernel that supports writing
+            # output reports when such a kernel has been released.
+            return
 
+        hid = bytearray((report_id,))
         self.fd.write(hid + data)
 
     def close(self):
@@ -73,6 +81,14 @@ class HidrawBluetoothDS4Device(HidrawDS4Device):
         # Cut off bluetooth data
         return zero_copy_slice(self.buf, 2)
 
+    def set_operational(self):
+        try:
+            buf = bytearray(38)
+            buf[0] = 0x2
+            fcntl.ioctl(self.fd, HIDIOCGFEATURE_38, bytes(buf))
+        except IOError:
+            pass
+
     @property
     def report_size(self):
         return 78
@@ -89,6 +105,9 @@ class HidrawUSBDS4Device(HidrawDS4Device):
 
     def get_trimmed_report_data(self):
         return self.buf
+
+    def set_operational(self):
+        self.set_led(255, 255, 255)
 
     @property
     def report_size(self):
