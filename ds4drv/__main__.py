@@ -57,9 +57,14 @@ class DS4Controller(object):
 
             yield
 
-    def setup_device(self, device):
+    def setup_device(self, device, new_device=True):
         self.device = device
         self.device.set_led(*self.options.led)
+
+        if new_device:
+            # Reset the status of existing report actions
+            for action in self.actions:
+                action.reset()
 
     def load_options(self, options):
         self.options = options
@@ -117,7 +122,7 @@ class DS4Controller(object):
             Daemon.exit("Failed to create input device: {0}", err)
 
         if self.device:
-            self.setup_device(self.device)
+            self.setup_device(self.device, new_device=False)
 
     def read_device(self, device):
         self.setup_device(device)

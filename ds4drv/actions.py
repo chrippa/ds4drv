@@ -35,6 +35,9 @@ class ReportAction(object):
                 if not repeat:
                     self.timers.pop(func, None)
 
+    def reset(self):
+        pass
+
 
 class ReportActionBattery(ReportAction):
     def __init__(self, controller):
@@ -70,6 +73,9 @@ class ReportActionBinding(ReportAction):
             elif released and combo in self.active:
                 action()
                 self.active.remove(combo)
+
+    def reset(self):
+        self.active = set()
 
 
 class ReportActionInput(ReportAction):
@@ -127,3 +133,6 @@ class ReportActionStatus(ReportAction):
         self.report = report
 
         return True
+
+    def reset(self):
+        self.report = None
