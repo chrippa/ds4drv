@@ -7,6 +7,7 @@ from evdev import UInput, UInputError, ecodes
 from .exceptions import DeviceError
 
 A2D_DEADZONE = 50
+A2R_DEADZONE = 20
 
 UInputMapping = namedtuple("UInputMapping",
                            "name bustype vendor product version "
@@ -294,14 +295,26 @@ class UInputDevice(object):
                     self.mouse_pos.pop(name, None)
                     continue
 
-            pos = getattr(report, attr)
-            if name not in self.mouse_pos:
+                pos = getattr(report, attr)
+                if name not in self.mouse_pos:
+                    self.mouse_pos[name] = pos
+
+                sensitivity = 0.5
+                rel = (pos - self.mouse_pos[name]) * sensitivity
                 self.mouse_pos[name] = pos
 
-            sensitivity = 0.5
-            rel = (pos - self.mouse_pos[name]) * sensitivity
+            elif "analog" in attr:
+                pos = getattr(report, attr)
+                if pos > (128 + A2R_DEADZONE) or pos < (128 - A2R_DEADZONE):
+                    accel = (pos - 128) / 10
+                else:
+                    continue
+
+                sensitivity = 0.4
+                rel = accel * sensitivity
+
             self.device.write(ecodes.EV_REL, getattr(ecodes, name), int(rel))
-            self.mouse_pos[name] = pos
+
 
 
 def create_uinput_device(mapping):
