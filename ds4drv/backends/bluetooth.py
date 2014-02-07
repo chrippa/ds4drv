@@ -69,6 +69,9 @@ class BluetoothDS4Device(DS4Device):
         self.int_sock.close()
         self.ctl_sock.close()
 
+    def disconnect(self):
+        self.close()
+
 
 class BluetoothBackend(Backend):
     __name__ = "bluetooth"
