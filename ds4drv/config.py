@@ -31,7 +31,7 @@ class Config(object):
         return args
 
     def section(self, section):
-        return dict(self.config.items(section))
+        return dict(filter(lambda i: bool(i[1]), self.config.items(section)))
 
     def sections(self, prefix):
         for section in self.config.sections():

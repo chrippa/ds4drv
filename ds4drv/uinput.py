@@ -6,6 +6,7 @@ from evdev import UInput, UInputError, ecodes
 
 from .exceptions import DeviceError
 
+A2D_DEADZONE = 50
 
 UInputMapping = namedtuple("UInputMapping",
                            "name bustype vendor product version "
@@ -249,10 +250,24 @@ class UInputDevice(object):
 
         for name, attr in self.layout.buttons.items():
             name = getattr(ecodes, name)
+
+            if attr[0] in ("+", "-"):
+                modifier = attr[0]
+                attr = attr[1:]
+            else:
+                modifier = False
+
             if attr in self.ignored_buttons:
                 value = False
             else:
                 value = getattr(report, attr)
+
+            if modifier and "analog" in attr:
+                if modifier == "+":
+                    value = value > (128 + A2D_DEADZONE)
+                elif modifier == "-":
+                    value = value < (128 - A2D_DEADZONE)
+
             self.device.write(ecodes.EV_KEY, name, value)
 
         for name, attr in self.layout.hats.items():
@@ -315,8 +330,7 @@ def parse_uinput_mapping(name, mapping):
         elif key.startswith("REL_"):
             mouse[key] = attr
 
-    create_mapping(name, description, axes=axes, buttons=buttons,
-                   mouse=mouse)
+    create_mapping(name, description, axes=axes, buttons=buttons, mouse=mouse)
 
 
 def next_joystick_device():
