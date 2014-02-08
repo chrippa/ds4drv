@@ -7,7 +7,7 @@ from evdev import UInput, UInputError, ecodes
 from .exceptions import DeviceError
 
 A2D_DEADZONE = 50
-A2R_DEADZONE = 20
+A2R_DEADZONE = 5
 
 UInputMapping = namedtuple("UInputMapping",
                            "name bustype vendor product version "
@@ -305,7 +305,7 @@ class UInputDevice(object):
                 else:
                     continue
 
-                sensitivity = 0.4
+                sensitivity = 0.3
                 self.mouse_rel[name] += accel * sensitivity
 
             rel = int(self.mouse_rel[name])
