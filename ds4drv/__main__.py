@@ -40,6 +40,10 @@ class DS4Controller(object):
             self.actions[0].add_binding(options.profile_toggle,
                                         lambda: next(self.profile_iterator))
 
+        if options.disconnect:
+            self.actions[0].add_binding(options.disconnect,
+                                        lambda: self.device.disconnect())
+
         self.load_options(options)
 
     def create_profile_iterator(self, options):
@@ -138,7 +142,8 @@ class DS4Controller(object):
 class ControllerAction(argparse.Action):
     __options__ = ["battery_flash", "emulate_xboxdrv", "emulate_xpad",
                    "emulate_xpad_wireless", "led", "mapping",
-                   "profile_toggle", "profiles", "trackpad_mouse"]
+                   "profile_toggle", "profiles", "disconnect",
+                   "trackpad_mouse"]
 
     @classmethod
     def default_controller(cls):
@@ -242,6 +247,9 @@ controllopt.add_argument("--profiles", metavar="profiles",
                          help="profiles to cycle through using the button "
                               "specified by --profile-toggle, e.g. "
                               "'profile1,profile2'")
+controllopt.add_argument("--disconnect", metavar="button(s)",
+                         type=buttoncombo,
+                         help="a button combo that will disconnect the device")
 controllopt.add_argument("--trackpad-mouse", action="store_true",
                          help="makes the trackpad control the mouse")
 controllopt.add_argument("--next-controller", nargs=0, action=ControllerAction,

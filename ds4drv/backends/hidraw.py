@@ -1,5 +1,6 @@
 import fcntl
 import itertools
+import subprocess
 
 from evdev import InputDevice
 from pyudev import Context, Monitor
@@ -72,6 +73,8 @@ class HidrawBluetoothDS4Device(HidrawDS4Device):
         return "Wireless Controller"
 
     def __init__(self, hidraw_device, event_device, type, addr, sys_name):
+        self.addr = addr
+
         device_name = "{0} {1}".format(addr, sys_name)
 
         super(HidrawBluetoothDS4Device, self).__init__(hidraw_device,
@@ -89,6 +92,10 @@ class HidrawBluetoothDS4Device(HidrawDS4Device):
             fcntl.ioctl(self.fd, HIDIOCGFEATURE_38, bytes(buf))
         except IOError:
             pass
+
+    def disconnect(self):
+        subprocess.call("echo 'disconnect {0}' | bluetoothctl".format(self.addr),
+                        shell=True, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
 
     @property
     def report_size(self):
@@ -170,7 +177,7 @@ class HidrawBackend(Backend):
                 if hid_device["HID_NAME"] == HidrawBluetoothDS4Device.hid_name():
                     yield HidrawBluetoothDS4Device(hidraw_device.device_node,
                                                    event_device, "bluetooth",
-                                                   hid_device["HID_UNIQ"],
+                                                   hid_device["HID_UNIQ"].upper(),
                                                    hidraw_device.sys_name)
                 elif hid_device["HID_NAME"] == HidrawUSBDS4Device.hid_name():
                     yield HidrawUSBDS4Device(hidraw_device.device_node,
