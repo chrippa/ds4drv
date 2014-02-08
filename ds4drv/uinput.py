@@ -7,20 +7,21 @@ from evdev import UInput, UInputError, ecodes
 from .exceptions import DeviceError
 
 A2D_DEADZONE = 50
-A2R_DEADZONE = 5
 
 UInputMapping = namedtuple("UInputMapping",
                            "name bustype vendor product version "
-                           "axes axes_options buttons hats keys mouse")
+                           "axes axes_options buttons hats keys mouse "
+                           "mouse_options")
 
 _mappings = {}
 
 
 def create_mapping(name, description, bustype=0, vendor=0, product=0,
                    version=0, axes={}, axes_options={}, buttons={},
-                   hats={}, keys={}, mouse={}):
+                   hats={}, keys={}, mouse={}, mouse_options={}):
     mapping = UInputMapping(description, bustype, vendor, product, version,
-                            axes, axes_options, buttons, hats, keys, mouse)
+                            axes, axes_options, buttons, hats, keys, mouse,
+                            mouse_options)
     _mappings[name] = mapping
 
 
@@ -228,6 +229,8 @@ class UInputDevice(object):
         if layout.mouse:
             self.mouse_pos = {}
             self.mouse_rel = {}
+            self.mouse_analog_sensitivity = float(layout.mouse_options.get("MOUSE_SENSITIVITY", 0.3))
+            self.mouse_analog_deadzone = int(layout.mouse_options.get("MOUSE_DEADZONE", 5))
 
             for name in layout.mouse:
                 events[ecodes.EV_REL].append(getattr(ecodes, name))
@@ -300,12 +303,13 @@ class UInputDevice(object):
 
             elif "analog" in attr:
                 pos = getattr(report, attr)
-                if pos > (128 + A2R_DEADZONE) or pos < (128 - A2R_DEADZONE):
+                if (pos > (128 + self.mouse_analog_deadzone)
+                    or pos < (128 - self.mouse_analog_deadzone)):
                     accel = (pos - 128) / 10
                 else:
                     continue
 
-                sensitivity = 0.3
+                sensitivity = self.mouse_analog_sensitivity
                 self.mouse_rel[name] += accel * sensitivity
 
             rel = int(self.mouse_rel[name])
@@ -328,7 +332,7 @@ def create_uinput_device(mapping):
 
 
 def parse_uinput_mapping(name, mapping):
-    axes, buttons, mouse = {}, {}, {}
+    axes, buttons, mouse, mouse_options = {}, {}, {}, {}
     description = "ds4drv custom mapping ({0})".format(name)
 
     for key, attr in mapping.items():
@@ -339,8 +343,11 @@ def parse_uinput_mapping(name, mapping):
             axes[key] = attr
         elif key.startswith("REL_"):
             mouse[key] = attr
+        elif key.startswith("MOUSE_"):
+            mouse_options[key] = attr
 
-    create_mapping(name, description, axes=axes, buttons=buttons, mouse=mouse)
+    create_mapping(name, description, axes=axes, buttons=buttons,
+                   mouse=mouse, mouse_options=mouse_options)
 
 
 def next_joystick_device():
