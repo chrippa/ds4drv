@@ -2,6 +2,16 @@
 Release history
 ---------------
 
+0.3.0
+^^^^^
+
+- Added hidraw mode, patch by Lauri Niskanen.
+- Added config file support.
+- Added custom button mapping.
+- Added profiles.
+
+- Fixed crash when using Python <2.7.4
+
 0.2.1
 ^^^^^
 
