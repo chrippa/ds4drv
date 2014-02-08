@@ -1,9 +1,15 @@
+import os
+import subprocess
+
+from collections import namedtuple
 from time import time
 
 
 BATTERY_MAX          = 8
 BATTERY_MAX_CHARGING = 11
 BATTERY_WARNING      = 2
+
+BINDING_ACTIONS = {}
 
 
 class ReportTimer(object):
@@ -53,6 +59,8 @@ class ReportActionBattery(ReportAction):
         return True
 
 
+ActionBinding = namedtuple("ActionBinding", "callback args sticky")
+
 class ReportActionBinding(ReportAction):
     def __init__(self, controller):
         super(ReportActionBinding, self).__init__(controller)
@@ -60,8 +68,8 @@ class ReportActionBinding(ReportAction):
         self.bindings = {}
         self.active = set()
 
-    def add_binding(self, combo, action):
-        self.bindings[combo] = action
+    def add_binding(self, combo, callback, args=(), sticky=False):
+        self.bindings[combo] = ActionBinding(callback, args, sticky)
 
     def handle_report(self, report):
         for combo, action in self.bindings.items():
@@ -71,12 +79,13 @@ class ReportActionBinding(ReportAction):
             if active and combo not in self.active:
                 self.active.add(combo)
             elif released and combo in self.active:
-                action()
                 self.active.remove(combo)
+                action.callback(report, *action.args)
 
     def reset(self):
         self.active = set()
-
+        self.bindings = dict(filter(lambda kv: kv[1].sticky,
+                                    self.bindings.items()))
 
 class ReportActionInput(ReportAction):
     def handle_report(self, report):
@@ -137,6 +146,7 @@ class ReportActionStatus(ReportAction):
     def reset(self):
         self.report = None
 
+
 class ReportActionDump(ReportAction):
     def __init__(self, controller):
         super(ReportActionDump, self).__init__(controller)
@@ -152,3 +162,49 @@ class ReportActionDump(ReportAction):
         self.controller.logger.info(dump)
 
         return True
+
+
+def bindingaction(name):
+    def decorator(func):
+        BINDING_ACTIONS[name] = func
+        return func
+    return decorator
+
+
+@bindingaction("exec")
+def _exec(controller, cmd, *args):
+    controller.logger.info("Executing: {0} {1}", cmd, " ".join(args))
+
+    try:
+        subprocess.check_call([cmd] + list(args))
+    except (OSError, subprocess.CalledProcessError) as err:
+        controller.logger.error("Failed to execute process: {0}", err)
+
+
+@bindingaction("exec-background")
+def _exec_background(controller, cmd, *args):
+    controller.logger.info("Executing in the background: {0} {1}",
+                           cmd, " ".join(args))
+
+    try:
+        subprocess.Popen([cmd] + list(args),
+                         stdout=open(os.devnull),
+                         stderr=open(os.devnull))
+    except OSError as err:
+        controller.logger.error("Failed to execute process: {0}", err)
+
+
+@bindingaction("next-profile")
+def _next_profile(controller):
+    controller.next_profile()
+
+
+@bindingaction("prev-profile")
+def _prev_profile(controller):
+    controller.next_profile()
+
+
+@bindingaction("load-profile")
+def _load_profile(controller, profile):
+    controller.load_profile(profile)
+

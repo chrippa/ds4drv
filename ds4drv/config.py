@@ -14,13 +14,9 @@ class Config(object):
         self.config.read([filename])
 
     def section_to_args(self, section):
-        try:
-            items = self.config.items(section)
-        except configparser.NoSectionError:
-            return []
-
         args = []
-        for key, value in items:
+
+        for key, value in self.section(section).items():
             if value.lower() == "true":
                 args.append("--{0}".format(key))
             elif value.lower() == "false":
@@ -30,8 +26,14 @@ class Config(object):
 
         return args
 
-    def section(self, section):
-        return dict(filter(lambda i: bool(i[1]), self.config.items(section)))
+    def section(self, section, key_type=str, value_type=str):
+        try:
+            # Removes empty values and applies types
+            return dict(map(lambda kv: (key_type(kv[0]), value_type(kv[1])),
+                            filter(lambda i: bool(i[1]),
+                                   self.config.items(section))))
+        except configparser.NoSectionError:
+            return {}
 
     def sections(self, prefix):
         for section in self.config.sections():

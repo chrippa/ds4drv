@@ -1,13 +1,17 @@
 import argparse
 import os
+import re
+import shlex
 import sys
 
-from itertools import cycle
 from threading import Thread
 
 from . import __version__
-from .actions import (ReportActionBattery, ReportActionBinding,
-                      ReportActionDump, ReportActionInput,
+from .actions import (BINDING_ACTIONS,
+                      ReportActionBattery,
+                      ReportActionBinding,
+                      ReportActionDump,
+                      ReportActionInput,
                       ReportActionStatus)
 from .backends import BluetoothBackend, HidrawBackend
 from .config import Config
@@ -29,34 +33,89 @@ class DS4Controller(object):
         self.dynamic = dynamic
         self.logger = Daemon.logger.new_module("controller {0}".format(index))
 
-        self.actions = [cls(self) for cls in DEFAULT_ACTIONS]
         self.device = None
-        self.default_profile = options
         self.inputs = {}
-        self.profile_iterator = None
         self.joystick_layout = None
 
-        if options.profiles and options.profile_toggle:
-            self.profile_iterator = self.create_profile_iterator(options)
+        self.actions = [cls(self) for cls in DEFAULT_ACTIONS]
+        self.bindings = options.parent.bindings
+        self.current_profile = "default"
+        self.default_profile = options
+        self.options = self.default_profile
+        self.profiles = options.profiles
+        self.profile_options = dict(options.parent.profiles)
+        self.profile_options["default"] = self.default_profile
+
+        for binding, action in options.parent.bindings["global"].items():
+            self.actions[0].add_binding(binding, self.handle_binding_action,
+                                        args=(action,), sticky=True)
+
+        if self.profiles:
+            self.profiles.append("default")
+
+        if len(self.profiles) > 1 and options.profile_toggle:
             self.actions[0].add_binding(options.profile_toggle,
-                                        lambda: next(self.profile_iterator))
+                                        lambda r: self.next_profile(),
+                                        sticky=True)
 
-        self.load_options(options)
+    def load_profile(self, profile):
+        if profile == self.current_profile:
+            return
 
-    def create_profile_iterator(self, options):
-        profiles = dict(options.parent.profiles)
-        profiles["default"] = options
+        profile_options = self.profile_options.get(profile)
+        if profile_options:
+            self.logger.info("Switching to profile: {0}", profile)
+            self.load_options(profile_options)
+            self.current_profile = profile
+        else:
+            self.logger.warning("Ignoring invalid profile: {0}", profile)
 
-        for next_profile in cycle(options.profiles + ["default"]):
-            next_profile_options = profiles.get(next_profile)
-            if next_profile_options:
-                self.logger.info("Switching to profile: {0}", next_profile)
-                self.load_options(next_profile_options)
-            else:
-                self.logger.warning("Ignoring invalid profile: {0}",
-                                    next_profile)
+    def next_profile(self):
+        if not self.profiles:
+            return
 
-            yield
+        next_index = self.profiles.index(self.current_profile) + 1
+        if next_index >= len(self.profiles):
+            next_index = 0
+
+        self.load_profile(self.profiles[next_index])
+
+    def prev_profile(self):
+        if not self.profiles:
+            return
+
+        next_index = self.profiles.index(self.current_profile) - 1
+        if next_index < 0:
+            next_index = len(self.profiles) - 1
+
+        self.load_profile(self.profiles[next_index])
+
+    def handle_binding_action(self, report, action):
+        info = dict(name=self.device.device_name,
+                    profile=self.current_profile,
+                    report=report)
+
+        def replace_var(match):
+            var, attr = match.group("var", "attr")
+            var = info.get(var)
+            if attr:
+                var = getattr(var, attr, None)
+            return str(var)
+
+        action = re.sub(r"\$(?P<var>\w+)(\.(?P<attr>\w+))?",
+                        replace_var, action)
+        action_split = shlex.split(action)
+        action_type = action_split[0]
+        action_args = action_split[1:]
+
+        func = BINDING_ACTIONS.get(action_type)
+        if func:
+            try:
+                func(self, *action_args)
+            except Exception as err:
+                self.logger.error("Failed to execute action: {0}", err)
+        else:
+            self.logger.error("Invalid action type: {0}", action_type)
 
     def setup_device(self, device, new_device=True):
         self.device = device
@@ -67,9 +126,9 @@ class DS4Controller(object):
             for action in self.actions:
                 action.reset()
 
-    def load_options(self, options):
-        self.options = options
+            self.load_options(self.options)
 
+    def load_options(self, options):
         for action in self.actions:
             if type(action) not in DEFAULT_ACTIONS:
                 self.actions.remove(action)
@@ -77,12 +136,20 @@ class DS4Controller(object):
         if options.battery_flash:
             self.actions.append(ReportActionBattery(self))
 
+        self.actions[0].reset()
+        if options.bindings and options.bindings in self.bindings:
+            bindings = self.bindings[options.bindings]
+            for binding, action in bindings.items():
+                self.actions[0].add_binding(binding,
+                                            self.handle_binding_action,
+                                            args=(action,))
+
         if options.dump_reports:
             self.actions.append(ReportActionDump(self))
 
         try:
-            if self.options.mapping:
-                joystick_layout = self.options.mapping
+            if options.mapping:
+                joystick_layout = options.mapping
             elif self.options.emulate_xboxdrv:
                 joystick_layout = "xboxdrv"
             elif self.options.emulate_xpad:
@@ -92,9 +159,9 @@ class DS4Controller(object):
             else:
                 joystick_layout = "ds4"
 
-            if not self.inputs.get("mouse") and self.options.trackpad_mouse:
+            if not self.inputs.get("mouse") and options.trackpad_mouse:
                 self.inputs["mouse"] = create_uinput_device("mouse")
-            elif self.inputs.get("mouse") and not self.options.trackpad_mouse:
+            elif self.inputs.get("mouse") and not options.trackpad_mouse:
                 self.inputs["mouse"].device.close()
                 self.inputs.pop("mouse", None)
 
@@ -117,14 +184,16 @@ class DS4Controller(object):
 
                 # If the profile binding is a single button we don't want to
                 # send it to the joystick at all
-                if (self.profile_iterator and
+                if (self.profiles and self.default_profile.profile_toggle and
                     len(self.default_profile.profile_toggle) == 1):
+
                     button = self.default_profile.profile_toggle[0]
                     self.inputs["joystick"].ignored_buttons.add(button)
 
         except DeviceError as err:
             Daemon.exit("Failed to create input device: {0}", err)
 
+        self.options = options
         if self.device:
             self.setup_device(self.device, new_device=False)
 
@@ -140,10 +209,19 @@ class DS4Controller(object):
 
 
 class ControllerAction(argparse.Action):
-    __options__ = ["battery_flash", "emulate_xboxdrv", "emulate_xpad",
-                   "emulate_xpad_wireless", "led", "mapping",
-                   "profile_toggle", "profiles", "trackpad_mouse",
-                   "dump_reports"]
+    # These options are moved from the normal options namespace to
+    # a controller specific namespace on --next-controller.
+    __options__ = ["battery_flash",
+                   "bindings",
+                   "dump_reports",
+                   "emulate_xboxdrv",
+                   "emulate_xpad",
+                   "emulate_xpad_wireless",
+                   "led",
+                   "mapping",
+                   "profile_toggle",
+                   "profiles",
+                   "trackpad_mouse"]
 
     @classmethod
     def default_controller(cls):
@@ -235,6 +313,9 @@ controllopt.add_argument("--led", metavar="color", default="0000ff",
                          type=hexcolor,
                          help="sets color of the LED. Uses hex color codes, "
                               "e.g. 'ff0000' is red. Default is '0000ff' (blue)")
+controllopt.add_argument("--bindings", metavar="bindings",
+                         help="use custom action bindings specified in the "
+                              "config file")
 controllopt.add_argument("--mapping", metavar="mapping",
                          help="use a custom button mapping specified in the "
                               "config file")
@@ -296,6 +377,13 @@ def load_options():
         profile_options.parent = options
         options.profiles[name] = profile_options
 
+    options.bindings = {}
+    options.bindings["global"] = config.section("bindings",
+                                                key_type=buttoncombo)
+    for name, section in config.sections("bindings"):
+        options.bindings[name] = config.section(section,
+                                                key_type=buttoncombo)
+
     for name, section in config.sections("mapping"):
         mapping = config.section(section)
         parse_uinput_mapping(name, mapping)
@@ -307,7 +395,10 @@ def load_options():
 
 
 def main():
-    options = load_options()
+    try:
+        options = load_options()
+    except ValueError as err:
+        Daemon.exit("Failed to parse options: {0}", err)
 
     if options.hidraw:
         backend = HidrawBackend(Daemon.logger)
