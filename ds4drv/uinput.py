@@ -227,8 +227,11 @@ class UInputDevice(object):
 
         if layout.mouse:
             self.mouse_pos = {}
+            self.mouse_rel = {}
+
             for name in layout.mouse:
                 events[ecodes.EV_REL].append(getattr(ecodes, name))
+                self.mouse_rel[name] = 0.0
 
         self.device = UInput(name=layout.name, events=events,
                              bustype=layout.bustype, vendor=layout.vendor,
@@ -292,7 +295,7 @@ class UInputDevice(object):
                     self.mouse_pos[name] = pos
 
                 sensitivity = 0.5
-                rel = (pos - self.mouse_pos[name]) * sensitivity
+                self.mouse_rel[name] += (pos - self.mouse_pos[name]) * sensitivity
                 self.mouse_pos[name] = pos
 
             elif "analog" in attr:
@@ -303,9 +306,11 @@ class UInputDevice(object):
                     continue
 
                 sensitivity = 0.4
-                rel = accel * sensitivity
+                self.mouse_rel[name] += accel * sensitivity
 
-            self.device.write(ecodes.EV_REL, getattr(ecodes, name), int(rel))
+            rel = int(self.mouse_rel[name])
+            self.mouse_rel[name] = self.mouse_rel[name] - rel
+            self.device.write(ecodes.EV_REL, getattr(ecodes, name), rel)
 
 
 
