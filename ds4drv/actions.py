@@ -136,3 +136,19 @@ class ReportActionStatus(ReportAction):
 
     def reset(self):
         self.report = None
+
+class ReportActionDump(ReportAction):
+    def __init__(self, controller):
+        super(ReportActionDump, self).__init__(controller)
+
+        dump_interval = 0.02
+        self.add_timer(dump_interval, self.dump)
+
+    def dump(self, report):
+        dump = "Report dump\n"
+        for key, value in report._asdict().items():
+            dump += "    {0}: {1}\n".format(key, value)
+
+        self.controller.logger.info(dump)
+
+        return True

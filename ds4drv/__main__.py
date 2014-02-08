@@ -7,7 +7,8 @@ from threading import Thread
 
 from . import __version__
 from .actions import (ReportActionBattery, ReportActionBinding,
-                      ReportActionInput, ReportActionStatus)
+                      ReportActionDump, ReportActionInput,
+                      ReportActionStatus)
 from .backends import BluetoothBackend, HidrawBackend
 from .config import Config
 from .daemon import Daemon
@@ -76,6 +77,9 @@ class DS4Controller(object):
         if options.battery_flash:
             self.actions.append(ReportActionBattery(self))
 
+        if options.dump_reports:
+            self.actions.append(ReportActionDump(self))
+
         try:
             if self.options.mapping:
                 joystick_layout = self.options.mapping
@@ -138,7 +142,8 @@ class DS4Controller(object):
 class ControllerAction(argparse.Action):
     __options__ = ["battery_flash", "emulate_xboxdrv", "emulate_xpad",
                    "emulate_xpad_wireless", "led", "mapping",
-                   "profile_toggle", "profiles", "trackpad_mouse"]
+                   "profile_toggle", "profiles", "trackpad_mouse",
+                   "dump_reports"]
 
     @classmethod
     def default_controller(cls):
@@ -244,6 +249,8 @@ controllopt.add_argument("--profiles", metavar="profiles",
                               "'profile1,profile2'")
 controllopt.add_argument("--trackpad-mouse", action="store_true",
                          help="makes the trackpad control the mouse")
+controllopt.add_argument("--dump-reports", action="store_true",
+                         help="prints controller input reports")
 controllopt.add_argument("--next-controller", nargs=0, action=ControllerAction,
                          help="creates another controller")
 
