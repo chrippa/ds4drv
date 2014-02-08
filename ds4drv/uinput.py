@@ -204,14 +204,6 @@ class UInputDevice(object):
         self.ignored_buttons = set()
         self.create_device(layout)
 
-    def create_mouse(self):
-        events = {
-            ecodes.EV_REL: (ecodes.REL_X, ecodes.REL_Y),
-            ecodes.EV_KEY: (ecodes.BTN_LEFT, ecodes.BTN_RIGHT)
-        }
-        self.mouse = UInput(events)
-        self.mouse_pos = None
-
     def create_device(self, layout):
         events = {ecodes.EV_ABS: [], ecodes.EV_KEY: [],
                   ecodes.EV_REL: []}
