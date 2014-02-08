@@ -7,20 +7,21 @@ from evdev import UInput, UInputError, ecodes
 from .exceptions import DeviceError
 
 A2D_DEADZONE = 50
-A2R_DEADZONE = 20
 
 UInputMapping = namedtuple("UInputMapping",
                            "name bustype vendor product version "
-                           "axes axes_options buttons hats keys mouse")
+                           "axes axes_options buttons hats keys mouse "
+                           "mouse_options")
 
 _mappings = {}
 
 
 def create_mapping(name, description, bustype=0, vendor=0, product=0,
                    version=0, axes={}, axes_options={}, buttons={},
-                   hats={}, keys={}, mouse={}):
+                   hats={}, keys={}, mouse={}, mouse_options={}):
     mapping = UInputMapping(description, bustype, vendor, product, version,
-                            axes, axes_options, buttons, hats, keys, mouse)
+                            axes, axes_options, buttons, hats, keys, mouse,
+                            mouse_options)
     _mappings[name] = mapping
 
 
@@ -204,14 +205,6 @@ class UInputDevice(object):
         self.ignored_buttons = set()
         self.create_device(layout)
 
-    def create_mouse(self):
-        events = {
-            ecodes.EV_REL: (ecodes.REL_X, ecodes.REL_Y),
-            ecodes.EV_KEY: (ecodes.BTN_LEFT, ecodes.BTN_RIGHT)
-        }
-        self.mouse = UInput(events)
-        self.mouse_pos = None
-
     def create_device(self, layout):
         events = {ecodes.EV_ABS: [], ecodes.EV_KEY: [],
                   ecodes.EV_REL: []}
@@ -235,8 +228,13 @@ class UInputDevice(object):
 
         if layout.mouse:
             self.mouse_pos = {}
+            self.mouse_rel = {}
+            self.mouse_analog_sensitivity = float(layout.mouse_options.get("MOUSE_SENSITIVITY", 0.3))
+            self.mouse_analog_deadzone = int(layout.mouse_options.get("MOUSE_DEADZONE", 5))
+
             for name in layout.mouse:
                 events[ecodes.EV_REL].append(getattr(ecodes, name))
+                self.mouse_rel[name] = 0.0
 
         self.device = UInput(name=layout.name, events=events,
                              bustype=layout.bustype, vendor=layout.vendor,
@@ -300,20 +298,23 @@ class UInputDevice(object):
                     self.mouse_pos[name] = pos
 
                 sensitivity = 0.5
-                rel = (pos - self.mouse_pos[name]) * sensitivity
+                self.mouse_rel[name] += (pos - self.mouse_pos[name]) * sensitivity
                 self.mouse_pos[name] = pos
 
             elif "analog" in attr:
                 pos = getattr(report, attr)
-                if pos > (128 + A2R_DEADZONE) or pos < (128 - A2R_DEADZONE):
+                if (pos > (128 + self.mouse_analog_deadzone)
+                    or pos < (128 - self.mouse_analog_deadzone)):
                     accel = (pos - 128) / 10
                 else:
                     continue
 
-                sensitivity = 0.4
-                rel = accel * sensitivity
+                sensitivity = self.mouse_analog_sensitivity
+                self.mouse_rel[name] += accel * sensitivity
 
-            self.device.write(ecodes.EV_REL, getattr(ecodes, name), int(rel))
+            rel = int(self.mouse_rel[name])
+            self.mouse_rel[name] = self.mouse_rel[name] - rel
+            self.device.write(ecodes.EV_REL, getattr(ecodes, name), rel)
 
 
 
@@ -331,7 +332,7 @@ def create_uinput_device(mapping):
 
 
 def parse_uinput_mapping(name, mapping):
-    axes, buttons, mouse = {}, {}, {}
+    axes, buttons, mouse, mouse_options = {}, {}, {}, {}
     description = "ds4drv custom mapping ({0})".format(name)
 
     for key, attr in mapping.items():
@@ -342,8 +343,11 @@ def parse_uinput_mapping(name, mapping):
             axes[key] = attr
         elif key.startswith("REL_"):
             mouse[key] = attr
+        elif key.startswith("MOUSE_"):
+            mouse_options[key] = attr
 
-    create_mapping(name, description, axes=axes, buttons=buttons, mouse=mouse)
+    create_mapping(name, description, axes=axes, buttons=buttons,
+                   mouse=mouse, mouse_options=mouse_options)
 
 
 def next_joystick_device():
