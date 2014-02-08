@@ -53,7 +53,7 @@ class DS4Controller(object):
         if self.profiles:
             self.profiles.append("default")
 
-        if len(self.profiles) > 1 and options.profile_toggle:
+        if self.profiles and len(self.profiles) > 1 and options.profile_toggle:
             self.actions[0].add_binding(options.profile_toggle,
                                         lambda r: self.next_profile(),
                                         sticky=True)
@@ -416,8 +416,8 @@ def main():
     controllers = []
     threads = []
 
-    for index, options in enumerate(options.controllers):
-        controller = DS4Controller(index + 1, options)
+    for index, controller_options in enumerate(options.controllers):
+        controller = DS4Controller(index + 1, controller_options)
         controllers.append(controller)
 
     for device in backend.devices:
@@ -432,8 +432,9 @@ def main():
         # create one with default settings
         if not controllers:
             index = len(threads) + 1
-            options = ControllerAction.default_controller()
-            controller = DS4Controller(index, options, dynamic=True)
+            controller_options = ControllerAction.default_controller()
+            controller_options.parent = options
+            controller = DS4Controller(index, controller_options, dynamic=True)
         else:
             controller = controllers.pop(0)
 
