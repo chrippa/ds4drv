@@ -5,41 +5,6 @@ ds4drv
 ds4drv is a Sony DualShock 4 userspace driver for Linux.
 
 
-Background
-----------
-
-When I first got my DS4 controller I expected it work without any issues
-with Linux as it had been reported all over the internet that DS4 was a
-standard HID device and required no special drivers. This turned out not
-to be the case though, as when I attempted a standard pairing in Linux via
-bluetoothctl I only ended up with strange error messages.
-
-I tried asking for help on the
-`bluez mailing list <http://comments.gmane.org/gmane.linux.bluez.kernel/42097>`_
-but received no response. I tried to Google to find out if anyone else
-had succeed to use the DS4 via bluetooth, but found no success stories.
-I even tried to dig into the bluez code, but the error messages are very
-strange and doesn't seem to describe what is going wrong at all, so I
-didn't get anywhere there either.
-
-So I tried experimenting with connecting directly to the HID channels,
-just like the `libcwiid library <http://abstrakraft.org/cwiid/>`_ do with
-the Wiimote, and, it worked! Since I now had access to the raw HID report,
-I figured I might as well write a small driver to convert them into joystick
-events, and here it is, ds4drv!
-
-**Update (2014-01-21):** `Bluez 5.14 <http://www.bluez.org/bluez-5-14/>`_ has been
-released which contains support for the DS4. This project is therefore only useful
-if you want to access any features not yet supported by the Linux kernel, such as LED
-color or trackpad mouse.
-
-**Update (2014-01-29):** ds4drv (git version) can now handle USB devices when used with
-``--hidraw``. In addition, the hidraw backend supports using paired Bluetooth
-devices, but the Linux kernel currently does not allow sending correct reports
-to DualShock 4 controllers. This may change in the future enabling Bluetooth
-pairing with ds4drv.
-
-
 Features
 --------
 
@@ -47,43 +12,81 @@ Features
 - Setting the LED color
 - Reminding you about low battery by flashing the LED
 - Using the trackpad as a mouse
+- Custom mappings, map buttons and sticks to whatever mouse, key or joystick
+  action you want
+- Settings profiles that can be cycled through with a button binding
 
 
 Installing
 ----------
 
-Make sure you have the dependencies:
+Dependencies
+^^^^^^^^^^^^
 
-- Python 2.7 or 3.3 (for Debian/Ubuntu you need to install the *python2.7-dev* or the *python3.3-dev* package)
-- python-setuptools
+- `Python 2.7 or 3.3 <http://python.org/>`_ (for Debian/Ubuntu you need to
+  install the *python2.7-dev* or *python3.3-dev* package)
+- `python-setuptools <https://pythonhosted.org/setuptools/>`_
 - hcitool (usually available in the *bluez-utils* or equivalent package)
 
-Installing the latest release via `pip <http://www.pip-installer.org/>`_:
+These packages will normally be installed automatically by the setup script,
+but you may want to use your distros packages if available:
+
+- `pyudev <http://pyudev.readthedocs.org/>`_
+- `python-evdev <http://pythonhosted.org/evdev/>`_
+
+
+Stable release
+^^^^^^^^^^^^^^
+
+Installing the latest release is simple by using `pip <http://www.pip-installer.org/>`_:
 
 .. code-block:: bash
 
     $ sudo pip install ds4drv
 
-or if you want to run the latest development code, check out the source
-from Github and install it with:
+Development version
+^^^^^^^^^^^^^^^^^^^
+
+If you want to try out latest development code check out the source from
+Github and install it with:
 
 .. code-block:: bash
 
+    $ git clone https://github.com/chrippa/ds4drv.git
+    $ cd ds4drv
     $ sudo python setup.py install
 
 
 Using
 -----
 
-Simplest usage is to run it without any options:
+Raw bluetooth mode
+^^^^^^^^^^^^^^^^^^
+
+Prior to bluez 5.14 it was not possible to pair with the DS4. Therefore this
+workaround exists which connects directly to the DS4 when it has been started
+in pairing mode (by holding Share + PS until the LED starts blinking rapidly).
+
+This is the default mode when running without any options:
 
 .. code-block:: bash
 
    $ ds4drv
 
-**Note:** ds4drv does not support pairing, so to connect the controller you need to
-start it in pairing mode every time you want to use it. This is done by holding
-the Share and PS button until the LED starts blinking.
+
+Hidraw mode
+^^^^^^^^^^^
+
+This mode supports connecting to already paired bluetooth devices (requires
+bluez 5.14+) and devices connected by USB.
+
+.. code-block:: bash
+
+   $ ds4drv --hidraw
+
+**Note:** Unfortunately due to a kernel bug it is currently not possible to use
+any LED functionality when using bluetooth devices in this mode.
+
 
 Permissions
 ^^^^^^^^^^^
@@ -91,7 +94,8 @@ Permissions
 ds4drv uses the kernel module *uinput* to create input devices in user land and
 module *hidraw* to communicate with DualShock 4 controllers (when using
 ``--hidraw``), but this usually requires root permissions. You can change the
-permissions by copying the `udev rules file <udev/50-ds4drv.rules>`_ to ``/etc/udev/rules.d/``.
+permissions by copying the `udev rules file <udev/50-ds4drv.rules>`_ to
+``/etc/udev/rules.d/``.
 
 You may have to reload your udev rules after this with:
 
@@ -104,7 +108,24 @@ You may have to reload your udev rules after this with:
 Configuring
 -----------
 
-You can also configure some options, this will set the LED to a bright red:
+Configuration file
+^^^^^^^^^^^^^^^^^^
+
+The preferred way of configuring ds4drv is via a config file.
+Take a look at `ds4drv.conf <ds4drv.conf>`_ for example usage.
+
+ds4drv will look for the config file in the following paths:
+
+- ``~/.config/ds4drv.conf``
+- ``/etc/ds4drv.conf``
+
+... or you can specify your own location with ``--config``.
+
+
+Command line options
+^^^^^^^^^^^^^^^^^^^^
+You can also configure using command line options, this will set the LED
+to a bright red:
 
 .. code-block:: bash
 
@@ -117,8 +138,8 @@ Multiple controllers
 ^^^^^^^^^^^^^^^^^^^^
 
 ds4drv does in theory support multiple controllers (I only have one
-controller myself, so this is untested). You can give each controller different
-options like this:
+controller myself, so this is untested). You can give each controller
+different options like this:
 
 .. code-block:: bash
 
@@ -131,10 +152,10 @@ green on the second.
 Known issues/limitations
 ------------------------
 
-- No pairing, you must start your controller in pairing mode everytime
-- The controller will never be shut off, you need to do this manually by holding
-  the PS button until the controller shuts off
+- The controller will never be shut off, you need to do this manually by
+  holding the PS button until the controller shuts off
 - No rumble support
+
 
 References
 ----------
@@ -147,6 +168,4 @@ These resources have been very helpful when creating ds4drv:
 - https://gist.github.com/johndrinkwater/7708901
 - https://github.com/ehd/node-ds4
 - http://forums.pcsx2.net/Thread-DS4-To-XInput-Wrapper
-
-
 
