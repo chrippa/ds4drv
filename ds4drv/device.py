@@ -59,8 +59,9 @@ DS4Report = namedtuple("DS4Report",
 
 
 class DS4Device(object):
-    def __init__(self, device_name, type):
+    def __init__(self, device_name, device_addr, type):
         self.device_name = device_name
+        self.device_addr = device_addr
         self.type = type
 
         self._led = (0, 0, 0)

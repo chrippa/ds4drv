@@ -38,7 +38,8 @@ class BluetoothDS4Device(DS4Device):
         self.ctl_sock = ctl_sock
         self.int_sock = int_sock
 
-        super(BluetoothDS4Device, self).__init__(addr, "bluetooth")
+        super(BluetoothDS4Device, self).__init__(addr.upper(), addr,
+                                                 "bluetooth")
 
     def read_report(self):
         ret = self.int_sock.recv_into(self.buf)

@@ -15,7 +15,7 @@ HIDIOCGFEATURE_38 = 3223734279
 
 
 class HidrawDS4Device(DS4Device):
-    def __init__(self, hidraw_device, event_device, type, device_name):
+    def __init__(self, name, addr, type, hidraw_device, event_device):
         try:
             self.fd = open(hidraw_device, "rb+", 0)
             self.input_device = InputDevice(event_device)
@@ -25,7 +25,7 @@ class HidrawDS4Device(DS4Device):
 
         self.buf = bytearray(self.report_size)
 
-        super(HidrawDS4Device, self).__init__(device_name, type)
+        super(HidrawDS4Device, self).__init__(name, addr, type)
 
     def read_report(self):
         ret = self.fd.readinto(self.buf)
@@ -67,16 +67,7 @@ class HidrawDS4Device(DS4Device):
 
 
 class HidrawBluetoothDS4Device(HidrawDS4Device):
-    @staticmethod
-    def hid_name():
-        return "Wireless Controller"
-
-    def __init__(self, hidraw_device, event_device, type, addr, sys_name):
-        device_name = "{0} {1}".format(addr, sys_name)
-
-        super(HidrawBluetoothDS4Device, self).__init__(hidraw_device,
-                                                       event_device, type,
-                                                       device_name)
+    __type__ = "bluetooth"
 
     def get_trimmed_report_data(self):
         # Cut off bluetooth data
@@ -96,13 +87,7 @@ class HidrawBluetoothDS4Device(HidrawDS4Device):
 
 
 class HidrawUSBDS4Device(HidrawDS4Device):
-    @staticmethod
-    def hid_name():
-        return "Sony Computer Entertainment Wireless Controller"
-
-    def __init__(self, hidraw_device, event_device, type, sys_name):
-        super(HidrawUSBDS4Device, self).__init__(hidraw_device, event_device,
-                                                 type, sys_name)
+    __type__ = "usb"
 
     def get_trimmed_report_data(self):
         return self.buf
@@ -113,6 +98,12 @@ class HidrawUSBDS4Device(HidrawDS4Device):
     @property
     def report_size(self):
         return 64
+
+
+HID_DEVICES = {
+    "Sony Computer Entertainment Wireless Controller": HidrawUSBDS4Device,
+    "Wireless Controller": HidrawBluetoothDS4Device,
+}
 
 
 class HidrawBackend(Backend):
@@ -151,12 +142,11 @@ class HidrawBackend(Backend):
 
         for hidraw_device in itertools.chain(existing_devices, future_devices):
             hid_device = hidraw_device.parent
-
             if hid_device.subsystem != "hid":
                 continue
 
-            if hid_device["HID_NAME"] not in (HidrawBluetoothDS4Device.hid_name(),
-                                              HidrawUSBDS4Device.hid_name()):
+            cls = HID_DEVICES.get(hid_device.get("HID_NAME"))
+            if not cls:
                 continue
 
             for child in hid_device.parent.children:
@@ -166,15 +156,20 @@ class HidrawBackend(Backend):
             else:
                 continue
 
+
             try:
-                if hid_device["HID_NAME"] == HidrawBluetoothDS4Device.hid_name():
-                    yield HidrawBluetoothDS4Device(hidraw_device.device_node,
-                                                   event_device, "bluetooth",
-                                                   hid_device["HID_UNIQ"],
+                device_addr = hid_device.get("HID_UNIQ", "").upper()
+                if device_addr:
+                    device_name = "{0} {1}".format(device_addr,
                                                    hidraw_device.sys_name)
-                elif hid_device["HID_NAME"] == HidrawUSBDS4Device.hid_name():
-                    yield HidrawUSBDS4Device(hidraw_device.device_node,
-                                             event_device, "usb",
-                                             hidraw_device.sys_name)
+                else:
+                    device_name = hidraw_device.sys_name
+
+                yield cls(name=device_name,
+                          addr=device_addr,
+                          type=cls.__type__,
+                          hidraw_device=hidraw_device.device_node,
+                          event_device=event_device)
+
             except DeviceError as err:
                 self.logger.error("Unable to open DS4 device: {0}", err)
