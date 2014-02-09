@@ -415,6 +415,7 @@ def main():
         Daemon.fork(options.daemon_log, options.daemon_pid)
 
     controllers = []
+    devices = {}
     threads = []
 
     for index, controller_options in enumerate(options.controllers):
@@ -428,6 +429,14 @@ def main():
                 if not thread.controller.dynamic:
                     controllers.insert(0, thread.controller)
                 threads.remove(thread)
+
+                if thread.controller.device:
+                    devices.pop(thread.controller.device.device_addr, None)
+
+        if device.device_addr in devices:
+            backend.logger.warning("Ignoring already connected device: {0}",
+                                   device.device_addr)
+            continue
 
         # No pre-configured controller available,
         # create one with default settings
@@ -446,6 +455,7 @@ def main():
         thread.controller = controller
         thread.start()
         threads.append(thread)
+        devices[device.device_addr] = device
 
 if __name__ == "__main__":
     main()
