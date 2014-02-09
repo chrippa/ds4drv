@@ -73,10 +73,11 @@ class ReportActionBinding(ReportAction):
 
     def handle_report(self, report):
         for combo, action in self.bindings.items():
-            active = all(getattr(report, button) for button in combo)
-            released = not any(getattr(report, button) for button in combo)
+            modifiers = all(getattr(report, button) for button in combo[:-1])
+            active = getattr(report, combo[-1])
+            released = not active
 
-            if active and combo not in self.active:
+            if modifiers and active and combo not in self.active:
                 self.active.add(combo)
             elif released and combo in self.active:
                 self.active.remove(combo)
