@@ -11,7 +11,9 @@ from ..device import DS4Device
 from ..utils import zero_copy_slice
 
 
-HIDIOCGFEATURE_38 = 3223734279
+IOC_RW = 3221243904
+HIDIOCSFEATURE = lambda size: IOC_RW | (0x06 << 0) | (size << 16)
+HIDIOCGFEATURE = lambda size: IOC_RW | (0x07 << 0) | (size << 16)
 
 
 class HidrawDS4Device(DS4Device):
@@ -41,6 +43,13 @@ class HidrawDS4Device(DS4Device):
         buf = self.get_trimmed_report_data()
 
         return self.parse_report(buf)
+
+    def read_feature_report(self, report_id, size):
+        op = HIDIOCGFEATURE(size + 1)
+        buf = bytearray(size + 1)
+        buf[0] = report_id
+
+        return fcntl.ioctl(self.fd, op, bytes(buf))
 
     def get_trimmed_report_data(self):
         raise NotImplementedError
@@ -74,12 +83,7 @@ class HidrawBluetoothDS4Device(HidrawDS4Device):
         return zero_copy_slice(self.buf, 2)
 
     def set_operational(self):
-        try:
-            buf = bytearray(38)
-            buf[0] = 0x2
-            fcntl.ioctl(self.fd, HIDIOCGFEATURE_38, bytes(buf))
-        except IOError:
-            pass
+        self.read_feature_report(0x02, 37)
 
     @property
     def report_size(self):
@@ -93,7 +97,13 @@ class HidrawUSBDS4Device(HidrawDS4Device):
         return self.buf
 
     def set_operational(self):
-        self.set_led(255, 255, 255)
+        # Get the bluetooth MAC and set operational with a single report
+        addr = self.read_feature_report(0x81, 6)[1:]
+        addr = ["{0:02x}".format(c) for c in bytearray(addr)]
+        addr = ":".join(reversed(addr)).upper()
+
+        self.device_name = "{0} {1}".format(addr, self.device_name)
+        self.device_addr = addr
 
     @property
     def report_size(self):
