@@ -188,8 +188,8 @@ def _exec_background(controller, cmd, *args):
 
     try:
         subprocess.Popen([cmd] + list(args),
-                         stdout=open(os.devnull),
-                         stderr=open(os.devnull))
+                         stdout=open(os.devnull, "wb"),
+                         stderr=open(os.devnull, "wb"))
     except OSError as err:
         controller.logger.error("Failed to execute process: {0}", err)
 
