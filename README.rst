@@ -4,6 +4,9 @@ ds4drv
 
 ds4drv is a Sony DualShock 4 userspace driver for Linux.
 
+* Discussions: https://groups.google.com/forum/#!forum/ds4drv
+* GitHub: https://github.com/chrippa/ds4drv
+* PyPI: https://pypi.python.org/pypi/ds4drv
 
 Features
 --------
