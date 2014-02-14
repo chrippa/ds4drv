@@ -91,7 +91,7 @@ class DS4Controller(object):
         self.load_profile(self.profiles[next_index])
 
     def handle_binding_action(self, report, action):
-        info = dict(name=self.device.device_name,
+        info = dict(name=self.device.name,
                     profile=self.current_profile,
                     device_addr=self.device.device_addr,
                     report=report)
