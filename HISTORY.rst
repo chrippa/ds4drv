@@ -2,6 +2,12 @@
 Release history
 ---------------
 
+0.4.1
+^^^^^
+
+- Daemon mode was accidentally left on by default in ds4drv.conf.
+
+
 0.4.0
 ^^^^^
 
