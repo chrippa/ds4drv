@@ -26,7 +26,7 @@ Installing
 Dependencies
 ^^^^^^^^^^^^
 
-- `Python 2.7 or 3.3 <http://python.org/>`_ (for Debian/Ubuntu you need to
+- `Python <http://python.org/>`_ 2.7 or 3.3+ (for Debian/Ubuntu you need to
   install the *python2.7-dev* or *python3.3-dev* package)
 - `python-setuptools <https://pythonhosted.org/setuptools/>`_
 - hcitool (usually available in the *bluez-utils* or equivalent package)
@@ -34,8 +34,8 @@ Dependencies
 These packages will normally be installed automatically by the setup script,
 but you may want to use your distro's packages if available:
 
-- `pyudev 0.16 or higher <http://pyudev.readthedocs.org/>`_
-- `python-evdev 0.3.0 or higher <http://pythonhosted.org/evdev/>`_
+- `pyudev <http://pyudev.readthedocs.org/>`_ 0.16 or higher
+- `python-evdev <http://pythonhosted.org/evdev/>`_ 0.3.0 or higher
 
 
 Stable release
