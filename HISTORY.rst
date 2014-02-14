@@ -2,6 +2,22 @@
 Release history
 ---------------
 
+0.4.0
+^^^^^
+
+- Added ``--dump-reports`` option, patch by Lauri Niskanen.
+- Added support for binding buttons combos to special actions.
+- Fixed crash when multiple controllers where used.
+- Fixed python-evdev version requirement.
+- Fixed pyudev version requirement.
+- Fixed duplicate devices when connecting a USB cable to a already
+  connected Bluetooth device in hidraw mode.
+- Improved mouse movement and configuration, patch by Lauri Niskanen.
+- Changed button combo behaviour slightly. Now triggers when the
+  last button of a combo is released instead of waiting for the
+  whole combo to be released.
+
+
 0.3.0
 ^^^^^
 
@@ -11,6 +27,7 @@ Release history
 - Added profiles.
 
 - Fixed crash when using Python <2.7.4
+
 
 0.2.1
 ^^^^^
