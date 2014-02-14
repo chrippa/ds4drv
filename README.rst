@@ -34,7 +34,7 @@ Dependencies
 These packages will normally be installed automatically by the setup script,
 but you may want to use your distros packages if available:
 
-- `pyudev <http://pyudev.readthedocs.org/>`_
+- `pyudev 0.16 or higher <http://pyudev.readthedocs.org/>`_
 - `python-evdev <http://pythonhosted.org/evdev/>`_
 
 
