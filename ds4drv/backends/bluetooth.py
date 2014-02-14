@@ -64,7 +64,10 @@ class BluetoothDS4Device(DS4Device):
         self.ctl_sock.sendall(hid + data)
 
     def set_operational(self):
-        self.set_led(255, 255, 255)
+        try:
+            self.set_led(255, 255, 255)
+        except socket.error as err:
+            raise DeviceError("Failed to set operational mode: {0}".format(err))
 
     def close(self):
         self.int_sock.close()
@@ -89,11 +92,16 @@ class BluetoothBackend(Backend):
 
     def scan(self):
         """Scan for bluetooth devices."""
-        devices = []
-        res = subprocess.check_output(["hcitool", "scan", "--flush"],
-                                      stderr=subprocess.STDOUT)
-        res = res.splitlines()[1:]
+        try:
+            res = subprocess.check_output(["hcitool", "scan", "--flush"],
+                                          stderr=subprocess.STDOUT)
+        except subprocess.CalledProcessError:
+             raise BackendError("'hcitool scan' returned error. Make sure "
+                                "your bluetooth device is powered up with "
+                                "'hciconfig hciX up'.")
 
+        devices = []
+        res = res.splitlines()[1:]
         for _, bdaddr, name in map(lambda l: l.split(b"\t"), res):
             devices.append((bdaddr.decode("ascii"), name.decode("ascii")))
 
@@ -121,6 +129,11 @@ class BluetoothBackend(Backend):
                     log_msg = True
                 else:
                     log_msg = False
+            except BackendError as err:
+                self.logger.error("Error while scanning for devices: {0}",
+                                  err)
+                return
             except DeviceError as err:
                 self.logger.error("Unable to connect to detected device: {0}",
                                   err)
+
