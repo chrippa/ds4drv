@@ -32,10 +32,10 @@ Dependencies
 - hcitool (usually available in the *bluez-utils* or equivalent package)
 
 These packages will normally be installed automatically by the setup script,
-but you may want to use your distros packages if available:
+but you may want to use your distro's packages if available:
 
 - `pyudev 0.16 or higher <http://pyudev.readthedocs.org/>`_
-- `python-evdev <http://pythonhosted.org/evdev/>`_
+- `python-evdev 0.3.0 or higher <http://pythonhosted.org/evdev/>`_
 
 
 Stable release
