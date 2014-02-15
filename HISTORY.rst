@@ -2,6 +2,13 @@
 Release history
 ---------------
 
+0.4.2
+^^^^^
+
+- Fixed regressions in controller options handling causing issues
+  with device creation and using joystick layouts in profiles.
+
+
 0.4.1
 ^^^^^
 
