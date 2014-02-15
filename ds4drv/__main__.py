@@ -58,6 +58,8 @@ class DS4Controller(object):
                                         lambda r: self.next_profile(),
                                         sticky=True)
 
+        self.load_options(self.options)
+
     def load_profile(self, profile):
         if profile == self.current_profile:
             return
@@ -151,11 +153,11 @@ class DS4Controller(object):
         try:
             if options.mapping:
                 joystick_layout = options.mapping
-            elif self.options.emulate_xboxdrv:
+            elif options.emulate_xboxdrv:
                 joystick_layout = "xboxdrv"
-            elif self.options.emulate_xpad:
+            elif options.emulate_xpad:
                 joystick_layout = "xpad"
-            elif self.options.emulate_xpad_wireless:
+            elif options.emulate_xpad_wireless:
                 joystick_layout = "xpad_wireless"
             else:
                 joystick_layout = "ds4"
