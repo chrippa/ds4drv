@@ -205,6 +205,8 @@ class UInputDevice(object):
         self.ignored_buttons = set()
         self.create_device(layout)
 
+        self._write_cache = {}
+
     def create_device(self, layout):
         events = {ecodes.EV_ABS: [], ecodes.EV_KEY: [],
                   ecodes.EV_REL: []}
@@ -241,11 +243,17 @@ class UInputDevice(object):
                              product=layout.product, version=layout.version)
         self.layout = layout
 
+    def write_event(self, etype, code, value):
+        last_value = self._write_cache.get(code)
+        if last_value != value:
+            self.device.write(etype, code, value)
+            self._write_cache[code] = value
+
     def emit(self, report):
         for name, attr in self.layout.axes.items():
             name = getattr(ecodes, name)
             value = getattr(report, attr)
-            self.device.write(ecodes.EV_ABS, name, value)
+            self.write_event(ecodes.EV_ABS, name, value)
 
         for name, attr in self.layout.buttons.items():
             name = getattr(ecodes, name)
@@ -267,7 +275,7 @@ class UInputDevice(object):
                 elif modifier == "-":
                     value = value < (128 - A2D_DEADZONE)
 
-            self.device.write(ecodes.EV_KEY, name, value)
+            self.write_event(ecodes.EV_KEY, name, value)
 
         for name, attr in self.layout.hats.items():
             name = getattr(ecodes, name)
@@ -278,7 +286,7 @@ class UInputDevice(object):
             else:
                 value = 0
 
-            self.device.write(ecodes.EV_ABS, name, value)
+            self.write_event(ecodes.EV_ABS, name, value)
 
         if self.layout.mouse:
             self.emit_mouse(report)
