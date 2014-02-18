@@ -202,7 +202,7 @@ def _next_profile(controller):
 
 @bindingaction("prev-profile")
 def _prev_profile(controller):
-    controller.next_profile()
+    controller.prev_profile()
 
 
 @bindingaction("load-profile")
