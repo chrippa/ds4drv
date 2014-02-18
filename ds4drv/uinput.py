@@ -7,6 +7,7 @@ from evdev import UInput, UInputError, ecodes
 from .exceptions import DeviceError
 
 A2D_DEADZONE = 50
+BUTTON_MODIFIERS = ("+", "-")
 
 UInputMapping = namedtuple("UInputMapping",
                            "name bustype vendor product version "
@@ -16,9 +17,25 @@ UInputMapping = namedtuple("UInputMapping",
 _mappings = {}
 
 
+def parse_button(attr):
+    if attr[0] in BUTTON_MODIFIERS:
+        modifier = attr[0]
+        attr = attr[1:]
+    else:
+        modifier = None
+
+    return (attr, modifier)
+
+
 def create_mapping(name, description, bustype=0, vendor=0, product=0,
                    version=0, axes={}, axes_options={}, buttons={},
                    hats={}, keys={}, mouse={}, mouse_options={}):
+    axes = {getattr(ecodes, k): v for k,v in axes.items()}
+    axes_options = {getattr(ecodes, k): v for k,v in axes_options.items()}
+    buttons = {getattr(ecodes, k): parse_button(v) for k,v in buttons.items()}
+    hats = {getattr(ecodes, k): v for k,v in hats.items()}
+    mouse = {getattr(ecodes, k): v for k,v in mouse.items()}
+
     mapping = UInputMapping(description, bustype, vendor, product, version,
                             axes, axes_options, buttons, hats, keys, mouse,
                             mouse_options)
@@ -216,17 +233,15 @@ class UInputDevice(object):
             self.joystick_dev = next_joystick_device()
 
         for name in layout.axes:
-            key = getattr(ecodes, name)
             params = layout.axes_options.get(name, (0, 255, 0, 15))
-            events[ecodes.EV_ABS].append((key, params))
+            events[ecodes.EV_ABS].append((name, params))
 
         for name in layout.hats:
-            key = getattr(ecodes, name)
             params = (-1, 1, 0, 0)
-            events[ecodes.EV_ABS].append((key, params))
+            events[ecodes.EV_ABS].append((name, params))
 
         for name in layout.buttons:
-            events[ecodes.EV_KEY].append(getattr(ecodes, name))
+            events[ecodes.EV_KEY].append(name)
 
         if layout.mouse:
             self.mouse_pos = {}
@@ -235,7 +250,7 @@ class UInputDevice(object):
             self.mouse_analog_deadzone = int(layout.mouse_options.get("MOUSE_DEADZONE", 5))
 
             for name in layout.mouse:
-                events[ecodes.EV_REL].append(getattr(ecodes, name))
+                events[ecodes.EV_REL].append(name)
                 self.mouse_rel[name] = 0.0
 
         self.device = UInput(name=layout.name, events=events,
@@ -251,18 +266,11 @@ class UInputDevice(object):
 
     def emit(self, report):
         for name, attr in self.layout.axes.items():
-            name = getattr(ecodes, name)
             value = getattr(report, attr)
             self.write_event(ecodes.EV_ABS, name, value)
 
         for name, attr in self.layout.buttons.items():
-            name = getattr(ecodes, name)
-
-            if attr[0] in ("+", "-"):
-                modifier = attr[0]
-                attr = attr[1:]
-            else:
-                modifier = False
+            attr, modifier = attr
 
             if attr in self.ignored_buttons:
                 value = False
@@ -278,7 +286,6 @@ class UInputDevice(object):
             self.write_event(ecodes.EV_KEY, name, value)
 
         for name, attr in self.layout.hats.items():
-            name = getattr(ecodes, name)
             if getattr(report, attr[0]):
                 value = -1
             elif getattr(report, attr[1]):
@@ -322,8 +329,7 @@ class UInputDevice(object):
 
             rel = int(self.mouse_rel[name])
             self.mouse_rel[name] = self.mouse_rel[name] - rel
-            self.device.write(ecodes.EV_REL, getattr(ecodes, name), rel)
-
+            self.device.write(ecodes.EV_REL, name, rel)
 
 
 def create_uinput_device(mapping):
@@ -363,4 +369,3 @@ def next_joystick_device():
         dev = "/dev/input/js{0}".format(i)
         if not os.path.exists(dev):
             return dev
-
