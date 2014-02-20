@@ -2,6 +2,13 @@
 Release history
 ---------------
 
+0.4.3
+^^^^^
+
+- A few performance improvements.
+- Fixed prev-profile action.
+
+
 0.4.2
 ^^^^^
 
