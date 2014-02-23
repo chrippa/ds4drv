@@ -1,61 +1,69 @@
-from collections import namedtuple
 from struct import Struct
+from sys import version_info as sys_version
 
 
 class StructHack(Struct):
-    """Python <2.7.4 doesn't support struct unpack from bytearray"""
-    def unpack(self, buf):
-        if isinstance(buf, bytearray):
-            buf = bytes(buf)
+    """Python <2.7.4 doesn't support struct unpack from bytearray."""
+    def unpack_from(self, buf, offset=0):
+        buf = buffer(buf)
 
-        return Struct.unpack(self, buf)
+        return Struct.unpack_from(self, buf, offset)
 
-S16LE = StructHack("<h")
 
-DS4Report = namedtuple("DS4Report",
-                       ["left_analog_x",
-                        "left_analog_y",
-                        "right_analog_x",
-                        "right_analog_y",
-                        "l2_analog",
-                        "r2_analog",
-                        "dpad_up",
-                        "dpad_down",
-                        "dpad_left",
-                        "dpad_right",
-                        "button_cross",
-                        "button_circle",
-                        "button_square",
-                        "button_triangle",
-                        "button_l1",
-                        "button_l2",
-                        "button_l3",
-                        "button_r1",
-                        "button_r2",
-                        "button_r3",
-                        "button_share",
-                        "button_options",
-                        "button_trackpad",
-                        "button_ps",
-                        "motion_y",
-                        "motion_x",
-                        "motion_z",
-                        "orientation_roll",
-                        "orientation_yaw",
-                        "orientation_pitch",
-                        "trackpad_touch0_id",
-                        "trackpad_touch0_active",
-                        "trackpad_touch0_x",
-                        "trackpad_touch0_y",
-                        "trackpad_touch1_id",
-                        "trackpad_touch1_active",
-                        "trackpad_touch1_x",
-                        "trackpad_touch1_y",
-                        "timestamp",
-                        "battery",
-                        "plug_usb",
-                        "plug_audio",
-                        "plug_mic"])
+if sys_version[0] == 2 and sys_version[1] <= 7 and sys_version[2] <= 4:
+    S16LE = StructHack("<h")
+else:
+    S16LE = Struct("<h")
+
+
+class DS4Report(object):
+    __slots__ = ["left_analog_x",
+                 "left_analog_y",
+                 "right_analog_x",
+                 "right_analog_y",
+                 "l2_analog",
+                 "r2_analog",
+                 "dpad_up",
+                 "dpad_down",
+                 "dpad_left",
+                 "dpad_right",
+                 "button_cross",
+                 "button_circle",
+                 "button_square",
+                 "button_triangle",
+                 "button_l1",
+                 "button_l2",
+                 "button_l3",
+                 "button_r1",
+                 "button_r2",
+                 "button_r3",
+                 "button_share",
+                 "button_options",
+                 "button_trackpad",
+                 "button_ps",
+                 "motion_y",
+                 "motion_x",
+                 "motion_z",
+                 "orientation_roll",
+                 "orientation_yaw",
+                 "orientation_pitch",
+                 "trackpad_touch0_id",
+                 "trackpad_touch0_active",
+                 "trackpad_touch0_x",
+                 "trackpad_touch0_y",
+                 "trackpad_touch1_id",
+                 "trackpad_touch1_active",
+                 "trackpad_touch1_x",
+                 "trackpad_touch1_y",
+                 "timestamp",
+                 "battery",
+                 "plug_usb",
+                 "plug_audio",
+                 "plug_mic"]
+
+    def __init__(self, *args, **kwargs):
+        for i, value in enumerate(args):
+            setattr(self, self.__slots__[i], value)
 
 
 class DS4Device(object):
@@ -164,14 +172,14 @@ class DS4Device(object):
             (buf[7] & 2) != 0, (buf[7] & 1) != 0,
 
             # Acceleration
-            S16LE.unpack(buf[13:15])[0],
-            S16LE.unpack(buf[15:17])[0],
-            S16LE.unpack(buf[17:19])[0],
+            S16LE.unpack_from(buf, 13)[0],
+            S16LE.unpack_from(buf, 15)[0],
+            S16LE.unpack_from(buf, 17)[0],
 
             # Orientation
-            -(S16LE.unpack(buf[19:21])[0]),
-            S16LE.unpack(buf[21:23])[0],
-            S16LE.unpack(buf[23:25])[0],
+            -(S16LE.unpack_from(buf, 19)[0]),
+            S16LE.unpack_from(buf, 21)[0],
+            S16LE.unpack_from(buf, 23)[0],
 
             # Trackpad touch 1: id, active, x, y
             buf[35] & 0x7f, (buf[35] >> 7) == 0,

@@ -157,7 +157,8 @@ class ReportActionDump(ReportAction):
 
     def dump(self, report):
         dump = "Report dump\n"
-        for key, value in report._asdict().items():
+        for key in report.__slots__:
+            value = getattr(report, key)
             dump += "    {0}: {1}\n".format(key, value)
 
         self.controller.logger.info(dump)

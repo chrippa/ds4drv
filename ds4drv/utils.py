@@ -3,7 +3,7 @@ import sys
 from .device import DS4Report
 
 
-VALID_BUTTONS = DS4Report._fields
+VALID_BUTTONS = DS4Report.__slots__
 
 
 def parse_button_combo(combo):
