@@ -6,7 +6,7 @@ from .device import DS4Report
 VALID_BUTTONS = DS4Report.__slots__
 
 
-def parse_button_combo(combo):
+def parse_button_combo(combo, sep="+"):
     def button_prefix(button):
         button = button.strip()
         if button in ("up", "down", "left", "right"):
@@ -19,7 +19,7 @@ def parse_button_combo(combo):
 
         return prefix + button
 
-    return tuple(map(button_prefix, combo.lower().split("+")))
+    return tuple(map(button_prefix, combo.lower().split(sep)))
 
 
 def zero_copy_slice(buf, start=None, end=None):

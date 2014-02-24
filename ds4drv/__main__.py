@@ -4,6 +4,7 @@ import re
 import shlex
 import sys
 
+from functools import partial
 from threading import Thread
 
 from . import __version__
@@ -18,7 +19,7 @@ from .config import Config
 from .daemon import Daemon
 from .exceptions import BackendError, DeviceError
 from .uinput import create_uinput_device, parse_uinput_mapping
-from .utils import parse_button_combo as buttoncombo
+from .utils import parse_button_combo
 
 
 CONFIG_FILES = ("~/.config/ds4drv.conf", "/etc/ds4drv.conf")
@@ -182,6 +183,10 @@ class DS4Controller(object):
             else:
                 joystick = None
 
+            self.inputs["joystick"].ignored_buttons = set()
+            for button in options.ignored_buttons:
+                self.inputs["joystick"].ignored_buttons.add(button)
+
             if joystick:
                 self.joystick_layout = joystick_layout
 
@@ -220,6 +225,7 @@ class ControllerAction(argparse.Action):
                    "emulate_xboxdrv",
                    "emulate_xpad",
                    "emulate_xpad_wireless",
+                   "ignored_buttons",
                    "led",
                    "mapping",
                    "profile_toggle",
@@ -273,6 +279,12 @@ def stringlist(s):
     return list(filter(None, map(str.strip, s.split(","))))
 
 
+def buttoncombo(sep):
+    func = partial(parse_button_combo, sep=sep)
+    func.__name__ = "button combo"
+    return func
+
+
 parser = argparse.ArgumentParser(prog="ds4drv")
 parser.add_argument("--version", action="version",
                     version="%(prog)s {0}".format(__version__))
@@ -312,6 +324,12 @@ controllopt.add_argument("--emulate-xpad", action="store_true",
 controllopt.add_argument("--emulate-xpad-wireless", action="store_true",
                          help="emulates the same joystick layout as a wireless "
                               "Xbox 360 controller used via the xpad module")
+controllopt.add_argument("--ignored-buttons", metavar="button(s)",
+                         type=buttoncombo(","), default=[],
+                         help="a comma-separated list of buttons to never send "
+                              "as joystick events. For example specify 'PS' to "
+                              "disable Steam's big picture mode shortcut when "
+                              "using the --emulate-* options")
 controllopt.add_argument("--led", metavar="color", default="0000ff",
                          type=hexcolor,
                          help="sets color of the LED. Uses hex color codes, "
@@ -323,7 +341,7 @@ controllopt.add_argument("--mapping", metavar="mapping",
                          help="use a custom button mapping specified in the "
                               "config file")
 controllopt.add_argument("--profile-toggle", metavar="button(s)",
-                         type=buttoncombo,
+                         type=buttoncombo("+"),
                          help="a button combo that will trigger profile "
                               "cycling, e.g. 'R1+L1+PS'")
 controllopt.add_argument("--profiles", metavar="profiles",
@@ -382,10 +400,10 @@ def load_options():
 
     options.bindings = {}
     options.bindings["global"] = config.section("bindings",
-                                                key_type=buttoncombo)
+                                                key_type=parse_button_combo)
     for name, section in config.sections("bindings"):
         options.bindings[name] = config.section(section,
-                                                key_type=buttoncombo)
+                                                key_type=parse_button_combo)
 
     for name, section in config.sections("mapping"):
         mapping = config.section(section)
