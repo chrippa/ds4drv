@@ -203,6 +203,54 @@ class DS4Device(object):
     def read_report(self):
         pass
 
+    def empty_report(self):
+        return DS4Report(
+            # Left analog stick
+            128, 128,
+
+            # Right analog stick
+            128, 128,
+
+            # L2 and R2 analog
+            0, 0,
+
+            # DPad up, down, left, right
+            False, False, False, False,
+
+            # Buttons cross, circle, square, triangle
+            False, False, False, False,
+
+            # L1, L2 and L3 buttons
+            False, False, False,
+
+            # R1, R2,and R3 buttons
+            False, False, False,
+
+            # Share and option buttons
+            False, False,
+
+            # Trackpad and PS buttons
+            False, False,
+
+            # Acceleration
+            0, 0, 0,
+
+            # Orientation
+            0, 0, 0,
+
+            # Trackpad touch 1: id, active, x, y
+            0, False, 0, 0,
+
+            # Trackpad touch 2: id, active, x, y
+            0, False, 0, 0,
+
+            # Timestamp and battery
+            0, 8,
+
+            # External inputs (usb, audio, mic)
+            False, False, False
+        )
+
     def write_report(self, report_id, data):
         pass
 

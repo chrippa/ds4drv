@@ -105,6 +105,10 @@ class DS4Controller(object):
         self.logger.info("Disconnected")
         self.fire_event("device-cleanup")
         self.loop.remove_watcher(self.device.report_fd)
+
+        for action in self.actions:
+            action.handle_report(self.device.empty_report())
+
         self.device.close()
         self.device = None
 
