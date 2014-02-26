@@ -28,6 +28,7 @@ class BluetoothDS4Device(DS4Device):
         try:
             ctl_socket.connect((addr, L2CAP_PSM_HIDP_CTRL))
             int_socket.connect((addr, L2CAP_PSM_HIDP_INTR))
+            int_socket.setblocking(False)
         except socket.error as err:
             DeviceError("Failed to connect: {0}".format(err))
 
@@ -37,6 +38,7 @@ class BluetoothDS4Device(DS4Device):
         self.buf = bytearray(REPORT_SIZE)
         self.ctl_sock = ctl_sock
         self.int_sock = int_sock
+        self.report_fd = int_sock.fileno()
 
         super(BluetoothDS4Device, self).__init__(addr.upper(), addr,
                                                  "bluetooth")

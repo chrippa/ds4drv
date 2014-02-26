@@ -6,6 +6,22 @@ from .device import DS4Report
 VALID_BUTTONS = DS4Report.__slots__
 
 
+def iter_except(func, exception, first=None):
+    """Call a function repeatedly until an exception is raised.
+
+    Converts a call-until-exception interface to an iterator interface.
+    Like __builtin__.iter(func, sentinel) but uses an exception instead
+    of a sentinel to end the loop.
+    """
+    try:
+        if first is not None:
+            yield first()
+        while True:
+            yield func()
+    except exception:
+        pass
+
+
 def parse_button_combo(combo, sep="+"):
     def button_prefix(button):
         button = button.strip()

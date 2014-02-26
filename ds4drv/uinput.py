@@ -295,9 +295,6 @@ class UInputDevice(object):
 
             self.write_event(ecodes.EV_ABS, name, value)
 
-        if self.layout.mouse:
-            self.emit_mouse(report)
-
         self.device.syn()
 
     def emit_mouse(self, report):
@@ -330,6 +327,8 @@ class UInputDevice(object):
             rel = int(self.mouse_rel[name])
             self.mouse_rel[name] = self.mouse_rel[name] - rel
             self.device.write(ecodes.EV_REL, name, rel)
+
+        self.device.syn()
 
 
 def create_uinput_device(mapping):

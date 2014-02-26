@@ -1,9 +1,12 @@
 import fcntl
 import itertools
+import os
+
+from io import FileIO
+from time import sleep
 
 from evdev import InputDevice
 from pyudev import Context, Monitor
-from time import sleep
 
 from ..backend import Backend
 from ..exceptions import DeviceError
@@ -19,7 +22,8 @@ HIDIOCGFEATURE = lambda size: IOC_RW | (0x07 << 0) | (size << 16)
 class HidrawDS4Device(DS4Device):
     def __init__(self, name, addr, type, hidraw_device, event_device):
         try:
-            self.fd = open(hidraw_device, "rb+", 0)
+            self.report_fd = os.open(hidraw_device, os.O_RDWR | os.O_NONBLOCK)
+            self.fd = FileIO(self.report_fd, "rb+", closefd=False)
             self.input_device = InputDevice(event_device)
             self.input_device.grab()
         except (OSError, IOError) as err:
@@ -30,7 +34,10 @@ class HidrawDS4Device(DS4Device):
         super(HidrawDS4Device, self).__init__(name, addr, type)
 
     def read_report(self):
-        ret = self.fd.readinto(self.buf)
+        try:
+            ret = self.fd.readinto(self.buf)
+        except IOError:
+            return
 
         # Disconnection
         if ret == 0:

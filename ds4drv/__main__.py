@@ -1,31 +1,35 @@
 import argparse
 import os
-import re
-import shlex
 import sys
 
 from functools import partial
 from threading import Thread
 
 from . import __version__
-from .actions import (BINDING_ACTIONS,
-                      ReportActionBattery,
+from .actions import (ReportActionBattery,
                       ReportActionBinding,
                       ReportActionDump,
                       ReportActionInput,
+                      ReportActionLED,
                       ReportActionStatus)
 from .backends import BluetoothBackend, HidrawBackend
 from .config import Config
 from .daemon import Daemon
-from .exceptions import BackendError, DeviceError
-from .uinput import create_uinput_device, parse_uinput_mapping
+from .eventloop import EventLoop
+from .exceptions import BackendError
+from .uinput import parse_uinput_mapping
 from .utils import parse_button_combo
 
 
+ACTIONS = (ReportActionBattery,
+           ReportActionBinding,
+           ReportActionDump,
+           ReportActionInput,
+           ReportActionLED,
+           ReportActionStatus)
 CONFIG_FILES = ("~/.config/ds4drv.conf", "/etc/ds4drv.conf")
 DAEMON_LOG_FILE = "~/.cache/ds4drv.log"
 DAEMON_PID_FILE = "/tmp/ds4drv.pid"
-DEFAULT_ACTIONS = (ReportActionBinding, ReportActionInput, ReportActionStatus)
 
 
 class DS4Controller(object):
@@ -34,11 +38,11 @@ class DS4Controller(object):
         self.dynamic = dynamic
         self.logger = Daemon.logger.new_module("controller {0}".format(index))
 
+        self.error = None
         self.device = None
-        self.inputs = {}
-        self.joystick_layout = None
+        self.loop = EventLoop()
 
-        self.actions = [cls(self) for cls in DEFAULT_ACTIONS]
+        self.actions = [cls(self) for cls in ACTIONS]
         self.bindings = options.parent.bindings
         self.current_profile = "default"
         self.default_profile = options
@@ -47,19 +51,13 @@ class DS4Controller(object):
         self.profile_options = dict(options.parent.profiles)
         self.profile_options["default"] = self.default_profile
 
-        for binding, action in options.parent.bindings["global"].items():
-            self.actions[0].add_binding(binding, self.handle_binding_action,
-                                        args=(action,), sticky=True)
-
         if self.profiles:
             self.profiles.append("default")
 
-        if self.profiles and len(self.profiles) > 1 and options.profile_toggle:
-            self.actions[0].add_binding(options.profile_toggle,
-                                        lambda r: self.next_profile(),
-                                        sticky=True)
-
         self.load_options(self.options)
+
+    def fire_event(self, event, *args):
+        self.loop.fire_event(event, *args)
 
     def load_profile(self, profile):
         if profile == self.current_profile:
@@ -70,6 +68,7 @@ class DS4Controller(object):
             self.logger.info("Switching to profile: {0}", profile)
             self.load_options(profile_options)
             self.current_profile = profile
+            self.fire_event("load-profile", profile)
         else:
             self.logger.warning("Ignoring invalid profile: {0}", profile)
 
@@ -93,127 +92,51 @@ class DS4Controller(object):
 
         self.load_profile(self.profiles[next_index])
 
-    def handle_binding_action(self, report, action):
-        info = dict(name=self.device.name,
-                    profile=self.current_profile,
-                    device_addr=self.device.device_addr,
-                    report=report)
+    def setup_device(self, device):
+        self.logger.info("Connected to {0}", device.name)
 
-        def replace_var(match):
-            var, attr = match.group("var", "attr")
-            var = info.get(var)
-            if attr:
-                var = getattr(var, attr, None)
-            return str(var)
-
-        action = re.sub(r"\$(?P<var>\w+)(\.(?P<attr>\w+))?",
-                        replace_var, action)
-        action_split = shlex.split(action)
-        action_type = action_split[0]
-        action_args = action_split[1:]
-
-        func = BINDING_ACTIONS.get(action_type)
-        if func:
-            try:
-                func(self, *action_args)
-            except Exception as err:
-                self.logger.error("Failed to execute action: {0}", err)
-        else:
-            self.logger.error("Invalid action type: {0}", action_type)
-
-    def setup_device(self, device, new_device=True):
         self.device = device
         self.device.set_led(*self.options.led)
+        self.loop.add_watcher(device.report_fd, self.read_report)
+        self.fire_event("device-setup", device)
+        self.load_options(self.options)
 
-        if new_device:
-            # Reset the status of existing report actions
-            for action in self.actions:
-                action.reset()
+    def cleanup_device(self):
+        self.logger.info("Disconnected")
+        self.fire_event("device-cleanup")
+        self.loop.remove_watcher(self.device.report_fd)
+        self.device.close()
+        self.device = None
 
-            self.load_options(self.options)
+        if self.dynamic:
+            self.loop.stop()
 
     def load_options(self, options):
-        for action in self.actions:
-            if type(action) not in DEFAULT_ACTIONS:
-                self.actions.remove(action)
-
-        if options.battery_flash:
-            self.actions.append(ReportActionBattery(self))
-
-        self.actions[0].reset()
-        if options.bindings and options.bindings in self.bindings:
-            bindings = self.bindings[options.bindings]
-            for binding, action in bindings.items():
-                self.actions[0].add_binding(binding,
-                                            self.handle_binding_action,
-                                            args=(action,))
-
-        if options.dump_reports:
-            self.actions.append(ReportActionDump(self))
-
-        try:
-            if options.mapping:
-                joystick_layout = options.mapping
-            elif options.emulate_xboxdrv:
-                joystick_layout = "xboxdrv"
-            elif options.emulate_xpad:
-                joystick_layout = "xpad"
-            elif options.emulate_xpad_wireless:
-                joystick_layout = "xpad_wireless"
-            else:
-                joystick_layout = "ds4"
-
-            if not self.inputs.get("mouse") and options.trackpad_mouse:
-                self.inputs["mouse"] = create_uinput_device("mouse")
-            elif self.inputs.get("mouse") and not options.trackpad_mouse:
-                self.inputs["mouse"].device.close()
-                self.inputs.pop("mouse", None)
-
-            if "joystick" in self.inputs and self.joystick_layout != joystick_layout:
-                self.inputs["joystick"].device.close()
-                joystick = create_uinput_device(joystick_layout)
-                self.inputs["joystick"] = joystick
-            elif "joystick" not in self.inputs:
-                joystick = create_uinput_device(joystick_layout)
-                self.inputs["joystick"] = joystick
-                if joystick.device.device:
-                    self.logger.info("Created devices {0} (joystick) "
-                                     "{1} (evdev) ", joystick.joystick_dev,
-                                     joystick.device.device.fn)
-            else:
-                joystick = None
-
-            self.inputs["joystick"].ignored_buttons = set()
-            for button in options.ignored_buttons:
-                self.inputs["joystick"].ignored_buttons.add(button)
-
-            if joystick:
-                self.joystick_layout = joystick_layout
-
-                # If the profile binding is a single button we don't want to
-                # send it to the joystick at all
-                if (self.profiles and self.default_profile.profile_toggle and
-                    len(self.default_profile.profile_toggle) == 1):
-
-                    button = self.default_profile.profile_toggle[0]
-                    self.inputs["joystick"].ignored_buttons.add(button)
-
-        except DeviceError as err:
-            Daemon.exit("Failed to create input device: {0}", err)
-
+        self.fire_event("load-options", options)
         self.options = options
+
+    def read_report(self):
+        report = self.device.read_report()
+
+        if not report:
+            if report is False:
+                return
+
+            self.cleanup_device()
+            return
+
+        for action in self.actions:
+            action.handle_report(report)
+
+    def run(self):
+        self.loop.run()
+
+    def exit(self, *args):
         if self.device:
-            self.setup_device(self.device, new_device=False)
+            self.cleanup_device()
 
-    def read_device(self, device):
-        self.setup_device(device)
-
-        for report in self.device.reports:
-            for action in self.actions:
-                action.handle_report(report)
-
-        self.logger.info("Disconnected")
-        self.device.close()
+        self.logger.error(*args)
+        self.error = True
 
 
 class ControllerAction(argparse.Action):
@@ -415,6 +338,17 @@ def load_options():
     return options
 
 
+def create_controller_thread(index, controller_options, dynamic=False):
+    controller = DS4Controller(index, controller_options, dynamic=dynamic)
+
+    thread = Thread(target=controller.run)
+    thread.daemon = True
+    thread.controller = controller
+    thread.start()
+
+    return thread
+
+
 def main():
     try:
         options = load_options()
@@ -434,48 +368,41 @@ def main():
     if options.daemon:
         Daemon.fork(options.daemon_log, options.daemon_pid)
 
-    controllers = []
-    devices = {}
     threads = []
-
     for index, controller_options in enumerate(options.controllers):
-        controller = DS4Controller(index + 1, controller_options)
-        controllers.append(controller)
+        thread = create_controller_thread(index + 1, controller_options)
+        threads.append(thread)
 
     for device in backend.devices:
+        connected_devices = []
         for thread in threads:
-            # Reclaim the joystick device if the controller is gone
+            # Controller has received a fatal error, exit
+            if thread.controller.error:
+                sys.exit(1)
+
+            if thread.controller.device:
+                connected_devices.append(thread.controller.device.device_addr)
+
+            # Clean up dynamic threads
             if not thread.is_alive():
-                if not thread.controller.dynamic:
-                    controllers.insert(0, thread.controller)
                 threads.remove(thread)
 
-                if thread.controller.device:
-                    devices.pop(thread.controller.device.device_addr, None)
-
-        if device.device_addr in devices:
+        if device.device_addr in connected_devices:
             backend.logger.warning("Ignoring already connected device: {0}",
                                    device.device_addr)
             continue
 
-        # No pre-configured controller available,
-        # create one with default settings
-        if not controllers:
-            index = len(threads) + 1
+        for thread in filter(lambda t: not t.controller.device, threads):
+            break
+        else:
             controller_options = ControllerAction.default_controller()
             controller_options.parent = options
-            controller = DS4Controller(index, controller_options, dynamic=True)
-        else:
-            controller = controllers.pop(0)
+            thread = create_controller_thread(len(threads) + 1,
+                                              controller_options,
+                                              dynamic=True)
+            threads.append(thread)
 
-        controller.logger.info("Connected to {0}", device.name)
-
-        thread = Thread(target=controller.read_device, args=(device,))
-        thread.daemon = True
-        thread.controller = controller
-        thread.start()
-        threads.append(thread)
-        devices[device.device_addr] = device
+        thread.controller.setup_device(device)
 
 if __name__ == "__main__":
     main()

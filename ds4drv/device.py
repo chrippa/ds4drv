@@ -220,17 +220,3 @@ class DS4Device(object):
             type_name = "USB"
 
         return "{0} Controller ({1})".format(type_name, self.device_name)
-
-    @property
-    def reports(self):
-        while True:
-            try:
-                report = self.read_report()
-            except (OSError, IOError):
-                break
-
-            if report is None:
-                break
-
-            if report:
-                yield report
