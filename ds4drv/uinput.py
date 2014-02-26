@@ -297,6 +297,19 @@ class UInputDevice(object):
 
         self.device.syn()
 
+    def emit_reset(self):
+        for name, attr in self.layout.axes.items():
+            params = self.layout.axes_options.get(name, (0, 255, 0, 15))
+            self.write_event(ecodes.EV_ABS, name, int(params[1] / 2))
+
+        for name, attr in self.layout.buttons.items():
+            self.write_event(ecodes.EV_KEY, name, False)
+
+        for name, attr in self.layout.hats.items():
+            self.write_event(ecodes.EV_ABS, name, 0)
+
+        self.device.syn()
+
     def emit_mouse(self, report):
         for name, attr in self.layout.mouse.items():
             if attr.startswith("trackpad_touch"):
