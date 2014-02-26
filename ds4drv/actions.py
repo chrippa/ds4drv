@@ -170,7 +170,7 @@ class ReportActionInput(ReportAction):
         # allow for at least one fresh report to be received inbetween
         self.add_timer(0.005, self.emit_mouse)
 
-    def cleanup(self):
+    def disable(self):
         self.remove_timer(self.emit_mouse)
 
     def load_options(self, options):
