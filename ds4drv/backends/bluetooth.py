@@ -44,7 +44,10 @@ class BluetoothDS4Device(DS4Device):
                                                  "bluetooth")
 
     def read_report(self):
-        ret = self.int_sock.recv_into(self.buf)
+        try:
+            ret = self.int_sock.recv_into(self.buf)
+        except IOError:
+            return
 
         # Disconnection
         if ret == 0:
