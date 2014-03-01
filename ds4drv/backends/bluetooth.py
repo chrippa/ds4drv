@@ -105,7 +105,7 @@ class BluetoothBackend(Backend):
         devices = []
         res = res.splitlines()[1:]
         for _, bdaddr, name in map(lambda l: l.split(b"\t"), res):
-            devices.append((bdaddr.decode("ascii"), name.decode("ascii")))
+            devices.append((bdaddr.decode("utf8"), name.decode("utf8")))
 
         return devices
 
