@@ -8,6 +8,7 @@ from .exceptions import DeviceError
 
 A2D_DEADZONE = 50
 BUTTON_MODIFIERS = ("+", "-")
+DEFAULT_AXIS_OPTIONS = (0, 255, 0, 5)
 
 UInputMapping = namedtuple("UInputMapping",
                            "name bustype vendor product version "
@@ -233,7 +234,7 @@ class UInputDevice(object):
             self.joystick_dev = next_joystick_device()
 
         for name in layout.axes:
-            params = layout.axes_options.get(name, (0, 255, 0, 15))
+            params = layout.axes_options.get(name, DEFAULT_AXIS_OPTIONS)
             events[ecodes.EV_ABS].append((name, params))
 
         for name in layout.hats:
@@ -298,14 +299,14 @@ class UInputDevice(object):
         self.device.syn()
 
     def emit_reset(self):
-        for name, attr in self.layout.axes.items():
-            params = self.layout.axes_options.get(name, (0, 255, 0, 15))
-            self.write_event(ecodes.EV_ABS, name, int(params[1] / 2))
+        for name in self.layout.axes:
+            params = self.layout.axes_options.get(name, DEFAULT_AXIS_OPTIONS)
+            self.write_event(ecodes.EV_ABS, name, sum(params[:2]) / 2)
 
-        for name, attr in self.layout.buttons.items():
+        for name in self.layout.buttons:
             self.write_event(ecodes.EV_KEY, name, False)
 
-        for name, attr in self.layout.hats.items():
+        for name in self.layout.hats:
             self.write_event(ecodes.EV_ABS, name, 0)
 
         self.device.syn()
