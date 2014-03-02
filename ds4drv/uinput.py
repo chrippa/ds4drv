@@ -301,7 +301,7 @@ class UInputDevice(object):
     def emit_reset(self):
         for name in self.layout.axes:
             params = self.layout.axes_options.get(name, DEFAULT_AXIS_OPTIONS)
-            self.write_event(ecodes.EV_ABS, name, sum(params[:2]) / 2)
+            self.write_event(ecodes.EV_ABS, name, int(sum(params[:2]) / 2))
 
         for name in self.layout.buttons:
             self.write_event(ecodes.EV_KEY, name, False)
