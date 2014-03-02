@@ -156,6 +156,44 @@ class ReportActionBinding(ReportAction):
                 action.callback(report, *action.args)
 
 
+class ReportActionBluetoothSignal(ReportAction):
+    def setup(self, device):
+        self.reports = 0
+        self.signal_warned = False
+
+        if device.type == "bluetooth":
+            self.enable()
+        else:
+            self.disable()
+
+    def enable(self):
+        self.add_timer(2.5, self.check_signal)
+
+    def disable(self):
+        self.remove_timer(self.check_signal)
+        self.remove_timer(self.reset_warning)
+
+    def check_signal(self, report):
+        # Less than 60 reports/s means we are probably dropping
+        # reports between frames in a 60 FPS game.
+        rps = int(self.reports / 2.5)
+        if not self.signal_warned and rps < 60:
+            self.logger.warning("Signal strength is low ({0} reports/s)", rps)
+            self.signal_warned = True
+            self.add_timer(60, self.reset_warning)
+
+        self.reports = 0
+
+        return True
+
+    def reset_warning(self, report):
+        self.signal_warned = False
+
+    def handle_report(self, report):
+        self.reports += 1
+        super(ReportActionBluetoothSignal, self).handle_report(report)
+
+
 class ReportActionInput(ReportAction):
     def __init__(self, controller):
         super(ReportActionInput, self).__init__(controller)

@@ -8,6 +8,7 @@ from threading import Thread
 from . import __version__
 from .actions import (ReportActionBattery,
                       ReportActionBinding,
+                      ReportActionBluetoothSignal,
                       ReportActionDump,
                       ReportActionInput,
                       ReportActionLED,
@@ -23,6 +24,7 @@ from .utils import parse_button_combo
 
 ACTIONS = (ReportActionBattery,
            ReportActionBinding,
+           ReportActionBluetoothSignal,
            ReportActionDump,
            ReportActionInput,
            ReportActionLED,
@@ -97,8 +99,8 @@ class DS4Controller(object):
 
         self.device = device
         self.device.set_led(*self.options.led)
-        self.loop.add_watcher(device.report_fd, self.read_report)
         self.fire_event("device-setup", device)
+        self.loop.add_watcher(device.report_fd, self.read_report)
         self.load_options(self.options)
 
     def cleanup_device(self):
