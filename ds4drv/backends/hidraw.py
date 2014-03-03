@@ -47,7 +47,11 @@ class HidrawDS4Device(DS4Device):
         if ret < self.report_size:
             return False
 
-        buf = self.get_trimmed_report_data()
+        if self.type == "bluetooth":
+            # Cut off bluetooth data
+            buf = zero_copy_slice(self.buf, 2)
+        else:
+            buf = self.buf
 
         return self.parse_report(buf)
 
@@ -77,44 +81,35 @@ class HidrawDS4Device(DS4Device):
         except IOError:
             pass
 
-    @property
-    def report_size(self):
-        raise NotImplementedError
-
 
 class HidrawBluetoothDS4Device(HidrawDS4Device):
     __type__ = "bluetooth"
 
+    report_size = 78
+
     def get_trimmed_report_data(self):
-        # Cut off bluetooth data
-        return zero_copy_slice(self.buf, 2)
+        pass
 
     def set_operational(self):
         self.read_feature_report(0x02, 37)
-
-    @property
-    def report_size(self):
-        return 78
 
 
 class HidrawUSBDS4Device(HidrawDS4Device):
     __type__ = "usb"
 
+    report_size = 64
+
     def get_trimmed_report_data(self):
         return self.buf
 
     def set_operational(self):
-        # Get the bluetooth MAC and set operational with a single report
+        # Get the bluetooth MAC
         addr = self.read_feature_report(0x81, 6)[1:]
         addr = ["{0:02x}".format(c) for c in bytearray(addr)]
         addr = ":".join(reversed(addr)).upper()
 
         self.device_name = "{0} {1}".format(addr, self.device_name)
         self.device_addr = addr
-
-    @property
-    def report_size(self):
-        return 64
 
 
 HID_DEVICES = {
