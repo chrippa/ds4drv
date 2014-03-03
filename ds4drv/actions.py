@@ -18,24 +18,17 @@ BATTERY_WARNING      = 2
 BINDING_ACTIONS = {}
 
 
-class ReportAction(object):
+class Action(object):
     def __init__(self, controller):
         self.controller = controller
         self.logger = controller.logger
-        self._last_report = None
 
         self.register_event("device-setup", self.setup)
         self.register_event("device-cleanup", self.disable)
         self.register_event("load-options", self.load_options)
 
     def add_timer(self, interval, func):
-        @wraps(func)
-        def wrapper():
-            if self._last_report:
-                return func(self._last_report)
-            return True
-
-        self.controller.loop.add_timer(interval, wrapper)
+        self.controller.loop.add_timer(interval, func)
 
     def remove_timer(self, func):
         self.controller.loop.remove_timer(func)
@@ -45,9 +38,6 @@ class ReportAction(object):
 
     def unregister_event(self, event, func):
         self.controller.loop.unregister_event(event, func)
-
-    def handle_report(self, report):
-        self._last_report = report
 
     def setup(self, device):
         pass
@@ -60,6 +50,39 @@ class ReportAction(object):
 
     def load_options(self, options):
         pass
+
+
+class ReportAction(Action):
+    def __init__(self, controller):
+        super(ReportAction, self).__init__(controller)
+
+        self._last_report = None
+        self.register_event("device-report", self._handle_report)
+
+    def add_timer(self, interval, func):
+        @wraps(func)
+        def wrapper():
+            if self._last_report:
+                return func(self._last_report)
+            return True
+
+        self.controller.loop.add_timer(interval, wrapper)
+
+    def _handle_report(self, report):
+        self._last_report = report
+        self.handle_report(report)
+
+    def handle_report(self, report):
+        pass
+
+
+class ActionLED(Action):
+    def setup(self, device):
+        device.set_led(*self.controller.options.led)
+
+    def load_options(self, options):
+        if self.controller.device:
+            self.controller.device.set_led(*options.led)
 
 
 class ReportActionBattery(ReportAction):
@@ -196,7 +219,6 @@ class ReportActionBluetoothSignal(ReportAction):
 
     def handle_report(self, report):
         self.reports += 1
-        super(ReportActionBluetoothSignal, self).handle_report(report)
 
 
 class ReportActionInput(ReportAction):
@@ -288,17 +310,6 @@ class ReportActionInput(ReportAction):
 
         if self.mouse:
             self.mouse.emit(report)
-
-        super(ReportActionInput, self).handle_report(report)
-
-
-class ReportActionLED(ReportAction):
-    def setup(self, device):
-        device.set_led(*self.controller.options.led)
-
-    def load_options(self, options):
-        if self.controller.device:
-            self.controller.device.set_led(*options.led)
 
 
 class ReportActionStatus(ReportAction):

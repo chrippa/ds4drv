@@ -6,12 +6,12 @@ from functools import partial
 from threading import Thread
 
 from . import __version__
-from .actions import (ReportActionBattery,
+from .actions import (ActionLED,
+                      ReportActionBattery,
                       ReportActionBinding,
                       ReportActionBluetoothSignal,
                       ReportActionDump,
                       ReportActionInput,
-                      ReportActionLED,
                       ReportActionStatus)
 from .backends import BluetoothBackend, HidrawBackend
 from .config import Config
@@ -22,12 +22,12 @@ from .uinput import parse_uinput_mapping
 from .utils import parse_button_combo
 
 
-ACTIONS = (ReportActionBattery,
+ACTIONS = (ActionLED,
+           ReportActionBattery,
            ReportActionBinding,
            ReportActionBluetoothSignal,
            ReportActionDump,
            ReportActionInput,
-           ReportActionLED,
            ReportActionStatus)
 CONFIG_FILES = ("~/.config/ds4drv.conf", "/etc/ds4drv.conf")
 DAEMON_LOG_FILE = "~/.cache/ds4drv.log"
@@ -127,8 +127,7 @@ class DS4Controller(object):
             self.cleanup_device()
             return
 
-        for action in self.actions:
-            action.handle_report(report)
+        self.fire_event("device-report", report)
 
     def run(self):
         self.loop.run()
