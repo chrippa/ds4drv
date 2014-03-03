@@ -155,6 +155,7 @@ green on the second.
 Known issues/limitations
 ------------------------
 
+- Bluetooth 2.0 dongles are known to have issues, 2.1+ is recommended.
 - The controller will never be shut off, you need to do this manually by
   holding the PS button until the controller shuts off
 - No rumble support
@@ -171,4 +172,13 @@ These resources have been very helpful when creating ds4drv:
 - https://gist.github.com/johndrinkwater/7708901
 - https://github.com/ehd/node-ds4
 - http://forums.pcsx2.net/Thread-DS4-To-XInput-Wrapper
+
+
+----
+
+.. |dogecoin| image:: http://targetmoon.com/img/dogecoin.png
+  :alt: Dogecoin
+  :target: http://dogecoin.com/
+
+|dogecoin| DCbQgDa4aEbm9QNm4ix6zYV9vMirUDQLNj
 
