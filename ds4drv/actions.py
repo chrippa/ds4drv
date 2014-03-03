@@ -87,21 +87,23 @@ class ReportActionBattery(ReportAction):
         return True
 
 
-ActionBinding = namedtuple("ActionBinding", "callback args")
+ActionBinding = namedtuple("ActionBinding", "modifiers button callback args")
 
 class ReportActionBinding(ReportAction):
     def __init__(self, controller):
         super(ReportActionBinding, self).__init__(controller)
 
-        self.bindings = {}
+        self.bindings = []
         self.active = set()
 
     def add_binding(self, combo, callback, *args):
-        self.bindings[combo] = ActionBinding(callback, args)
+        modifiers, button = combo[:-1], combo[-1]
+        binding = ActionBinding(modifiers, button, callback, args)
+        self.bindings.append(binding)
 
     def load_options(self, options):
         self.active = set()
-        self.bindings = {}
+        self.bindings = []
 
         bindings = (self.controller.bindings["global"].items(),
                     self.controller.bindings.get(options.bindings, {}).items())
@@ -144,16 +146,19 @@ class ReportActionBinding(ReportAction):
             self.logger.error("Invalid action type: {0}", action_type)
 
     def handle_report(self, report):
-        for combo, action in self.bindings.items():
-            modifiers = all(getattr(report, button) for button in combo[:-1])
-            active = getattr(report, combo[-1])
+        for binding in self.bindings:
+            modifiers = True
+            for button in binding.modifiers:
+                modifiers = modifiers and getattr(report, button)
+
+            active = getattr(report, binding.button)
             released = not active
 
-            if modifiers and active and combo not in self.active:
-                self.active.add(combo)
-            elif released and combo in self.active:
-                self.active.remove(combo)
-                action.callback(report, *action.args)
+            if modifiers and active and binding not in self.active:
+                self.active.add(binding)
+            elif released and binding in self.active:
+                self.active.remove(binding)
+                binding.callback(report, *binding.args)
 
 
 class ReportActionBluetoothSignal(ReportAction):
