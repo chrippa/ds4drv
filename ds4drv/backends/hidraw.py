@@ -62,9 +62,6 @@ class HidrawDS4Device(DS4Device):
 
         return fcntl.ioctl(self.fd, op, bytes(buf))
 
-    def get_trimmed_report_data(self):
-        raise NotImplementedError
-
     def write_report(self, report_id, data):
         if self.type == "bluetooth":
             # TODO: Add a check for a kernel that supports writing
@@ -87,9 +84,6 @@ class HidrawBluetoothDS4Device(HidrawDS4Device):
 
     report_size = 78
 
-    def get_trimmed_report_data(self):
-        pass
-
     def set_operational(self):
         self.read_feature_report(0x02, 37)
 
@@ -98,9 +92,6 @@ class HidrawUSBDS4Device(HidrawDS4Device):
     __type__ = "usb"
 
     report_size = 64
-
-    def get_trimmed_report_data(self):
-        return self.buf
 
     def set_operational(self):
         # Get the bluetooth MAC
