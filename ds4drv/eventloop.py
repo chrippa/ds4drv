@@ -8,34 +8,39 @@ from .packages import timerfd
 from .utils import iter_except
 
 
+class Timer(object):
+    def __init__(self, loop, interval, callback):
+        self.callback = callback
+        self.interval = interval
+        self.loop = loop
+        self.timer = timerfd.create(timerfd.CLOCK_MONOTONIC)
+
+    def start(self, *args, **kwargs):
+        @wraps(self.callback)
+        def callback():
+            os.read(self.timer, 8)
+            repeat = self.callback(*args, **kwargs)
+            if not repeat:
+                self.stop()
+
+        spec = timerfd.itimerspec(self.interval, self.interval)
+        timerfd.settime(self.timer, 0, spec)
+
+        self.loop.remove_watcher(self.timer)
+        self.loop.add_watcher(self.timer, callback)
+
+    def stop(self):
+        self.loop.remove_watcher(self.timer)
+
+
 class EventLoop(object):
     """Basic IO, event and timer loop with callbacks."""
 
     def __init__(self):
         self.stop()
 
-    def add_timer(self, interval, func):
-        fd = timerfd.create(timerfd.CLOCK_MONOTONIC)
-        timerfd.settime(fd, 0, timerfd.itimerspec(interval, interval))
-
-        @wraps(func)
-        def callback():
-            os.read(fd, 8)
-            repeat = func()
-            if not repeat:
-                self.remove_watcher(fd)
-
-        self.add_watcher(fd, callback)
-
-    def remove_timer(self, func):
-        for fd, callback in dict(self.callbacks).items():
-            if callback == func:
-                self.remove_watcher(fd)
-
-            if hasattr(callback, "__wrapped__"):
-                callback = callback.__wrapped__
-                if callback == func:
-                    self.remove_watcher(fd)
+    def create_timer(self, interval, callback):
+        return Timer(self, interval, callback)
 
     def add_watcher(self, fd, callback):
         if not isinstance(fd, int):
@@ -47,6 +52,9 @@ class EventLoop(object):
     def remove_watcher(self, fd):
         if not isinstance(fd, int):
             fd = fd.fileno()
+
+        if fd not in self.callbacks:
+            return
 
         self.callbacks.pop(fd, None)
         self.epoll.unregister(fd)

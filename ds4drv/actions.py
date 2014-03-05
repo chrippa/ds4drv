@@ -27,11 +27,8 @@ class Action(object):
         self.register_event("device-cleanup", self.disable)
         self.register_event("load-options", self.load_options)
 
-    def add_timer(self, interval, func):
-        self.controller.loop.add_timer(interval, func)
-
-    def remove_timer(self, func):
-        self.controller.loop.remove_timer(func)
+    def create_timer(self, interval, func):
+        return self.controller.loop.create_timer(interval, func)
 
     def register_event(self, event, func):
         self.controller.loop.register_event(event, func)
@@ -59,14 +56,14 @@ class ReportAction(Action):
         self._last_report = None
         self.register_event("device-report", self._handle_report)
 
-    def add_timer(self, interval, func):
-        @wraps(func)
-        def wrapper():
+    def create_timer(self, interval, callback):
+        @wraps(callback)
+        def wrapper(*args, **kwargs):
             if self._last_report:
-                return func(self._last_report)
+                return callback(self._last_report, *args, **kwargs)
             return True
 
-        self.controller.loop.add_timer(interval, wrapper)
+        return super(ReportAction, self).create_timer(interval, wrapper)
 
     def _handle_report(self, report):
         self._last_report = report
@@ -86,18 +83,24 @@ class ActionLED(Action):
 
 
 class ReportActionBattery(ReportAction):
+    def __init__(self, *args, **kwargs):
+        super(ReportActionBattery, self).__init__(*args, **kwargs)
+
+        self.timer_check = self.create_timer(60, self.check_battery)
+        self.timer_flash = self.create_timer(5, self.stop_flash)
+
     def enable(self):
-        self.add_timer(60, self.check_battery)
+        self.timer_check.start()
 
     def disable(self):
-        self.remove_timer(self.check_battery)
-        self.remove_timer(self.stop_flash)
+        self.timer_check.stop()
+        self.timer_flash.stop()
 
     def load_options(self, options):
-        self.disable()
-
         if options.battery_flash:
             self.enable()
+        else:
+            self.disable()
 
     def stop_flash(self, report):
         self.controller.device.stop_led_flash()
@@ -105,7 +108,7 @@ class ReportActionBattery(ReportAction):
     def check_battery(self, report):
         if report.battery < BATTERY_WARNING and not report.plug_usb:
             self.controller.device.start_led_flash(30, 30)
-            self.add_timer(5, self.stop_flash)
+            self.timer_flash.start()
 
         return True
 
@@ -185,6 +188,12 @@ class ReportActionBinding(ReportAction):
 
 
 class ReportActionBluetoothSignal(ReportAction):
+    def __init__(self, *args, **kwargs):
+        super(ReportActionBluetoothSignal, self).__init__(*args, **kwargs)
+
+        self.timer_check = self.create_timer(2.5, self.check_signal)
+        self.timer_reset = self.create_timer(60, self.reset_warning)
+
     def setup(self, device):
         self.reports = 0
         self.signal_warned = False
@@ -195,11 +204,11 @@ class ReportActionBluetoothSignal(ReportAction):
             self.disable()
 
     def enable(self):
-        self.add_timer(2.5, self.check_signal)
+        self.timer_check.start()
 
     def disable(self):
-        self.remove_timer(self.check_signal)
-        self.remove_timer(self.reset_warning)
+        self.timer_check.stop()
+        self.timer_reset.stop()
 
     def check_signal(self, report):
         # Less than 60 reports/s means we are probably dropping
@@ -208,7 +217,7 @@ class ReportActionBluetoothSignal(ReportAction):
         if not self.signal_warned and rps < 60:
             self.logger.warning("Signal strength is low ({0} reports/s)", rps)
             self.signal_warned = True
-            self.add_timer(60, self.reset_warning)
+            self.timer_reset.start()
 
         self.reports = 0
 
@@ -222,21 +231,23 @@ class ReportActionBluetoothSignal(ReportAction):
 
 
 class ReportActionInput(ReportAction):
-    def __init__(self, controller):
-        super(ReportActionInput, self).__init__(controller)
+    def __init__(self, *args, **kwargs):
+        super(ReportActionInput, self).__init__(*args, **kwargs)
 
         self.joystick = None
         self.joystick_layout = None
         self.mouse = None
 
-    def setup(self, device):
         # USB has a report frequency of 4 ms while BT is 2 ms, so we
         # use 5 ms between each mouse emit to keep it consistent and to
         # allow for at least one fresh report to be received inbetween
-        self.add_timer(0.005, self.emit_mouse)
+        self.timer = self.create_timer(0.005, self.emit_mouse)
+
+    def setup(self, device):
+        self.timer.start()
 
     def disable(self):
-        self.remove_timer(self.emit_mouse)
+        self.timer.stop()
 
         if self.joystick:
             self.joystick.emit_reset()
@@ -313,12 +324,16 @@ class ReportActionInput(ReportAction):
 
 
 class ReportActionStatus(ReportAction):
+    def __init__(self, *args, **kwargs):
+        super(ReportActionStatus, self).__init__(*args, **kwargs)
+        self.timer = self.create_timer(1, self.check_status)
+
     def setup(self, device):
         self.report = None
-        self.add_timer(1, self.check_status)
+        self.timer.start()
 
     def disable(self):
-        self.remove_timer(self.check_status)
+        self.timer.stop()
 
     def check_status(self, report):
         if not self.report:
@@ -365,17 +380,21 @@ class ReportActionStatus(ReportAction):
 
 
 class ReportActionDump(ReportAction):
+    def __init__(self, *args, **kwargs):
+        super(ReportActionDump, self).__init__(*args, **kwargs)
+        self.timer = self.create_timer(0.02, self.dump)
+
     def enable(self):
-        self.add_timer(0.02, self.dump)
+        self.timer.start()
 
     def disable(self):
-        self.remove_timer(self.dump)
+        self.timer.stop()
 
     def load_options(self, options):
-        self.disable()
-
         if options.dump_reports:
             self.enable()
+        else:
+            self.disable()
 
     def dump(self, report):
         dump = "Report dump\n"
