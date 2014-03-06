@@ -6,9 +6,12 @@ from evdev import UInput, UInputError, ecodes
 
 from .exceptions import DeviceError
 
-A2D_DEADZONE = 50
 BUTTON_MODIFIERS = ("+", "-")
+
+DEFAULT_A2D_DEADZONE = 50
 DEFAULT_AXIS_OPTIONS = (0, 255, 0, 5)
+DEFAULT_MOUSE_SENSITIVTY = 0.6
+DEFAULT_MOUSE_DEADZONE = 5
 
 UInputMapping = namedtuple("UInputMapping",
                            "name bustype vendor product version "
@@ -247,8 +250,14 @@ class UInputDevice(object):
         if layout.mouse:
             self.mouse_pos = {}
             self.mouse_rel = {}
-            self.mouse_analog_sensitivity = float(layout.mouse_options.get("MOUSE_SENSITIVITY", 0.3))
-            self.mouse_analog_deadzone = int(layout.mouse_options.get("MOUSE_DEADZONE", 5))
+            self.mouse_analog_sensitivity = float(
+                layout.mouse_options.get("MOUSE_SENSITIVITY",
+                                         DEFAULT_MOUSE_SENSITIVTY)
+            )
+            self.mouse_analog_deadzone = int(
+                layout.mouse_options.get("MOUSE_DEADZONE",
+                                         DEFAULT_MOUSE_DEADZONE)
+            )
 
             for name in layout.mouse:
                 events[ecodes.EV_REL].append(name)
@@ -280,9 +289,9 @@ class UInputDevice(object):
 
             if modifier and "analog" in attr:
                 if modifier == "+":
-                    value = value > (128 + A2D_DEADZONE)
+                    value = value > (128 + DEFAULT_A2D_DEADZONE)
                 elif modifier == "-":
-                    value = value < (128 - A2D_DEADZONE)
+                    value = value < (128 - DEFAULT_A2D_DEADZONE)
 
             self.write_event(ecodes.EV_KEY, name, value)
 
