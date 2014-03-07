@@ -6,7 +6,7 @@ readme = open("README.rst").read()
 history = open("HISTORY.rst").read()
 
 setup(name="ds4drv",
-      version="0.4.3",
+      version="0.5.0",
       description="A Sony DualShock 4 userspace driver for Linux",
       url="https://github.com/chrippa/ds4drv",
       author="Christopher Rosell",
