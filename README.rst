@@ -155,7 +155,7 @@ green on the second.
 Known issues/limitations
 ------------------------
 
-- Bluetooth 2.0 dongles are known to have issues, 2.1+ is recommended.
+- `Bluetooth 2.0 dongles are known to have issues, 2.1+ is recommended. <https://github.com/chrippa/ds4drv/wiki/Bluetooth%20dongle%20compatibility>`_
 - The controller will never be shut off, you need to do this manually by
   holding the PS button until the controller shuts off
 - No rumble support
