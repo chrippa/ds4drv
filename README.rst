@@ -72,7 +72,7 @@ Raw bluetooth mode
 Supported protocols: **Bluetooth**
 
 Unless your system is using BlueZ 5.14 (which was released recently) or higher
-it is not possible to pair the with the DS4. Therefore this workaround exists,
+it is not possible to pair with the DS4. Therefore this workaround exists,
 which connects directly to the DS4 when it has been started in pairing mode
 (by holding **Share + the PS button** until the LED starts blinking rapidly).
 
