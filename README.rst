@@ -63,12 +63,18 @@ Github and install it with:
 Using
 -----
 
+ds4drv has two different modes to find DS4 devices, decide which one to use
+depending on your use case. 
+
 Raw bluetooth mode
 ^^^^^^^^^^^^^^^^^^
 
-Prior to bluez 5.14 it was not possible to pair with the DS4. Therefore this
-workaround exists which connects directly to the DS4 when it has been started
-in pairing mode (by holding Share + PS until the LED starts blinking rapidly).
+Supported protocols: **Bluetooth**
+
+Unless your system is using BlueZ 5.14 (which was released recently) or higher
+it is not possible to pair the with the DS4. Therefore this workaround exists,
+which connects directly to the DS4 when it has been started in pairing mode
+(by holding **Share + the PS button** until the LED starts blinking rapidly).
 
 This is the default mode when running without any options:
 
@@ -80,12 +86,23 @@ This is the default mode when running without any options:
 Hidraw mode
 ^^^^^^^^^^^
 
-This mode supports connecting to already paired bluetooth devices (requires
-bluez 5.14+) and devices connected by USB.
+Supported protocols: **Bluetooth** and **USB**
+
+This mode uses the Linux kernel feature *hidraw* to talk to already existing
+devices on the system.
 
 .. code-block:: bash
 
    $ ds4drv --hidraw
+
+
+To use the DS4 via bluetooth in this mode you must pair it first. This requires
+**BlueZ 5.14+** as there was a bug preventing pairing in earlier verions. How you
+actually pair the DS4 with your computer depends on how your system is setup,
+suggested googling: *<distro name> bluetooth pairing*
+
+To use the DS4 via USB in this mode, simply connect your DS4 to your computer via
+a micro USB cable.
 
 **Note:** Unfortunately due to a kernel bug it is currently not possible to use
 any LED functionality when using bluetooth devices in this mode.
@@ -94,8 +111,11 @@ any LED functionality when using bluetooth devices in this mode.
 Permissions
 ^^^^^^^^^^^
 
+If you want to use ds4drv as a normal user, you need to make sure ds4drv has
+permissions to use certain features on your system.
+
 ds4drv uses the kernel module *uinput* to create input devices in user land and
-module *hidraw* to communicate with DualShock 4 controllers (when using
+the module *hidraw* to communicate with DualShock 4 controllers (when using
 ``--hidraw``), but this usually requires root permissions. You can change the
 permissions by copying the `udev rules file <udev/50-ds4drv.rules>`_ to
 ``/etc/udev/rules.d/``.
