@@ -13,6 +13,7 @@ L2CAP_PSM_HIDP_INTR = 0x13
 HIDP_TRANS_SET_REPORT = 0x50
 HIDP_DATA_RTYPE_OUTPUT  = 0x02
 
+REPORT_ID = 0x11
 REPORT_SIZE = 79
 
 
@@ -53,8 +54,8 @@ class BluetoothDS4Device(DS4Device):
         if ret == 0:
             return
 
-        # Invalid report size, just ignore it
-        if ret < REPORT_SIZE:
+        # Invalid report size or id, just ignore it
+        if ret < REPORT_SIZE or self.buf[1] != REPORT_ID:
             return False
 
         # Cut off bluetooth data

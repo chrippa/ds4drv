@@ -43,8 +43,8 @@ class HidrawDS4Device(DS4Device):
         if ret == 0:
             return
 
-        # Invalid report size, just ignore it
-        if ret < self.report_size:
+        # Invalid report size or id, just ignore it
+        if ret < self.report_size or self.buf[0] != self.valid_report_id:
             return False
 
         if self.type == "bluetooth":
@@ -83,6 +83,7 @@ class HidrawBluetoothDS4Device(HidrawDS4Device):
     __type__ = "bluetooth"
 
     report_size = 78
+    valid_report_id = 0x11
 
     def set_operational(self):
         self.read_feature_report(0x02, 37)
@@ -92,6 +93,7 @@ class HidrawUSBDS4Device(HidrawDS4Device):
     __type__ = "usb"
 
     report_size = 64
+    valid_report_id = 0x01
 
     def set_operational(self):
         # Get the bluetooth MAC
