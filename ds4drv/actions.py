@@ -19,6 +19,8 @@ BINDING_ACTIONS = {}
 
 
 class Action(object):
+    """Actions are what drives most of the functionality of ds4drv."""
+
     def __init__(self, controller):
         self.controller = controller
         self.logger = controller.logger
@@ -74,6 +76,8 @@ class ReportAction(Action):
 
 
 class ActionLED(Action):
+    """Sets the LED color on the device."""
+
     def setup(self, device):
         device.set_led(*self.controller.options.led)
 
@@ -83,6 +87,8 @@ class ActionLED(Action):
 
 
 class ReportActionBattery(ReportAction):
+    """Flashes the LED when battery is low."""
+
     def __init__(self, *args, **kwargs):
         super(ReportActionBattery, self).__init__(*args, **kwargs)
 
@@ -116,6 +122,8 @@ class ReportActionBattery(ReportAction):
 ActionBinding = namedtuple("ActionBinding", "modifiers button callback args")
 
 class ReportActionBinding(ReportAction):
+    """Listens for button presses and executes actions."""
+
     def __init__(self, controller):
         super(ReportActionBinding, self).__init__(controller)
 
@@ -188,6 +196,8 @@ class ReportActionBinding(ReportAction):
 
 
 class ReportActionBluetoothSignal(ReportAction):
+    """Warns when a low report rate is discovered and may impact usability."""
+
     def __init__(self, *args, **kwargs):
         super(ReportActionBluetoothSignal, self).__init__(*args, **kwargs)
 
@@ -231,6 +241,8 @@ class ReportActionBluetoothSignal(ReportAction):
 
 
 class ReportActionInput(ReportAction):
+    """Creates virtual input devices via uinput."""
+
     def __init__(self, *args, **kwargs):
         super(ReportActionInput, self).__init__(*args, **kwargs)
 
@@ -324,6 +336,8 @@ class ReportActionInput(ReportAction):
 
 
 class ReportActionStatus(ReportAction):
+    """Reports device statuses such as battery percentage to the log."""
+
     def __init__(self, *args, **kwargs):
         super(ReportActionStatus, self).__init__(*args, **kwargs)
         self.timer = self.create_timer(1, self.check_status)
@@ -380,6 +394,8 @@ class ReportActionStatus(ReportAction):
 
 
 class ReportActionDump(ReportAction):
+    """Pretty prints the reports to the log."""
+
     def __init__(self, *args, **kwargs):
         super(ReportActionDump, self).__init__(*args, **kwargs)
         self.timer = self.create_timer(0.02, self.dump)
@@ -416,6 +432,7 @@ def bindingaction(name):
 
 @bindingaction("exec")
 def _exec(controller, cmd, *args):
+    """Executes a subprocess in the foreground, blocking until returned."""
     controller.logger.info("Executing: {0} {1}", cmd, " ".join(args))
 
     try:
@@ -426,6 +443,7 @@ def _exec(controller, cmd, *args):
 
 @bindingaction("exec-background")
 def _exec_background(controller, cmd, *args):
+    """Executes a subprocess in the background."""
     controller.logger.info("Executing in the background: {0} {1}",
                            cmd, " ".join(args))
 
@@ -439,15 +457,18 @@ def _exec_background(controller, cmd, *args):
 
 @bindingaction("next-profile")
 def _next_profile(controller):
+    """Loads the next profile."""
     controller.next_profile()
 
 
 @bindingaction("prev-profile")
 def _prev_profile(controller):
+    """Loads the previous profile."""
     controller.prev_profile()
 
 
 @bindingaction("load-profile")
 def _load_profile(controller, profile):
+    """Loads the specified profile."""
     controller.load_profile(profile)
 

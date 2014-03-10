@@ -67,6 +67,11 @@ class DS4Report(object):
 
 
 class DS4Device(object):
+    """A DS4 controller object.
+
+    Used to control the device functions and reading HID reports.
+    """
+
     def __init__(self, device_name, device_addr, type):
         self.device_name = device_name
         self.device_addr = device_addr
@@ -84,25 +89,29 @@ class DS4Device(object):
                      flash_led2=self._led_flash[1], **kwargs)
 
     def rumble(self, small=0, big=0):
+        """Sets the intensity of the rumble motors. Valid range is 0-255."""
         self._control(small_rumble=small, big_rumble=big)
 
     def set_led(self, red=0, green=0, blue=0):
+        """Sets the LED color. Values are RGB between 0-255."""
         self._led = (red, green, blue)
         self._control()
 
     def start_led_flash(self, on, off):
+        """Starts flashing the LED."""
         if not self._led_flashing:
             self._led_flash = (on, off)
             self._led_flashing = True
             self._control()
 
     def stop_led_flash(self):
+        """Stops flashing the LED."""
         if self._led_flashing:
             self._led_flash = (0, 0)
             self._led_flashing = False
             # Call twice, once to stop flashing...
             self._control()
-            # ...and once more to make sure LED is set.
+            # ...and once more to make sure the LED is on.
             self._control()
 
     def control(self, big_rumble=0, small_rumble=0,
@@ -122,23 +131,24 @@ class DS4Device(object):
             report_id = 0x05
 
         # Rumble
-        pkt[offset+3] = big_rumble
-        pkt[offset+4] = small_rumble
+        pkt[offset+3] = min(small_rumble, 255)
+        pkt[offset+4] = min(big_rumble, 255)
 
         # LED (red, green, blue)
-        pkt[offset+5] = led_red
-        pkt[offset+6] = led_green
-        pkt[offset+7] = led_blue
+        pkt[offset+5] = min(led_red, 255)
+        pkt[offset+6] = min(led_green, 255)
+        pkt[offset+7] = min(led_blue, 255)
 
         # Time to flash bright (255 = 2.5 seconds)
-        pkt[offset+8] = flash_led1
+        pkt[offset+8] = min(flash_led1, 255)
 
         # Time to flash dark (255 = 2.5 seconds)
-        pkt[offset+9] = flash_led2
+        pkt[offset+9] = min(flash_led2, 255)
 
         self.write_report(report_id, pkt)
 
     def parse_report(self, buf):
+        """Parse a buffer containing a HID report."""
         dpad = buf[5] % 16
 
         return DS4Report(
@@ -201,15 +211,19 @@ class DS4Device(object):
         )
 
     def read_report(self):
+        """Read and parse a HID report."""
         pass
 
     def write_report(self, report_id, data):
+        """Writes a HID report to the control channel."""
         pass
 
     def set_operational(self):
+        """Tells the DS4 controller we want full HID reports."""
         pass
 
     def close(self):
+        """Disconnects from the device."""
         pass
 
     @property

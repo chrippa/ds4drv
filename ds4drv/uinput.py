@@ -229,6 +229,7 @@ class UInputDevice(object):
         self._write_cache = {}
 
     def create_device(self, layout):
+        """Creates a uinput device using the specified layout."""
         events = {ecodes.EV_ABS: [], ecodes.EV_KEY: [],
                   ecodes.EV_REL: []}
 
@@ -269,12 +270,15 @@ class UInputDevice(object):
         self.layout = layout
 
     def write_event(self, etype, code, value):
+        """Writes a event to the device, if it has changed."""
         last_value = self._write_cache.get(code)
         if last_value != value:
             self.device.write(etype, code, value)
             self._write_cache[code] = value
 
     def emit(self, report):
+        """Writes axes, buttons and hats with values from the report to
+        the device."""
         for name, attr in self.layout.axes.items():
             value = getattr(report, attr)
             self.write_event(ecodes.EV_ABS, name, value)
@@ -308,6 +312,7 @@ class UInputDevice(object):
         self.device.syn()
 
     def emit_reset(self):
+        """Resets the device to a blank state."""
         for name in self.layout.axes:
             params = self.layout.axes_options.get(name, DEFAULT_AXIS_OPTIONS)
             self.write_event(ecodes.EV_ABS, name, int(sum(params[:2]) / 2))
@@ -321,6 +326,7 @@ class UInputDevice(object):
         self.device.syn()
 
     def emit_mouse(self, report):
+        """Calculates relative mouse values from a report and writes them."""
         for name, attr in self.layout.mouse.items():
             if attr.startswith("trackpad_touch"):
                 active_attr = attr[:16] + "active"
@@ -355,6 +361,7 @@ class UInputDevice(object):
 
 
 def create_uinput_device(mapping):
+    """Creates a uinput device."""
     if mapping not in _mappings:
         raise DeviceError("Unknown device mapping: {0}".format(mapping))
 
@@ -368,6 +375,7 @@ def create_uinput_device(mapping):
 
 
 def parse_uinput_mapping(name, mapping):
+    """Parses a dict of mapping options."""
     axes, buttons, mouse, mouse_options = {}, {}, {}, {}
     description = "ds4drv custom mapping ({0})".format(name)
 
@@ -387,6 +395,7 @@ def parse_uinput_mapping(name, mapping):
 
 
 def next_joystick_device():
+    """Finds the next available js device name."""
     for i in range(100):
         dev = "/dev/input/js{0}".format(i)
         if not os.path.exists(dev):

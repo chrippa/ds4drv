@@ -1,6 +1,5 @@
 class BackendError(Exception):
-    pass
-
+    """Backend related errors."""
 
 class DeviceError(Exception):
-    pass
+    """Device related errors."""
