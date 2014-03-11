@@ -9,6 +9,7 @@ except ImportError:
     import configparser
 
 from functools import partial
+from operator import attrgetter
 
 from . import __version__
 from .uinput import parse_uinput_mapping
@@ -20,7 +21,24 @@ DAEMON_LOG_FILE = "~/.cache/ds4drv.log"
 DAEMON_PID_FILE = "/tmp/ds4drv.pid"
 
 
-parser = argparse.ArgumentParser(prog="ds4drv")
+class SortingHelpFormatter(argparse.HelpFormatter):
+    def add_argument(self, action):
+        action.help = action.help.capitalize()
+        super(SortingHelpFormatter, self).add_argument(action)
+        self.add_text("")
+
+    def start_section(self, heading):
+        heading = heading.capitalize()
+        return super(SortingHelpFormatter, self).start_section(heading)
+
+    def add_arguments(self, actions):
+        actions = sorted(actions, key=attrgetter("option_strings"))
+        super(SortingHelpFormatter, self).add_arguments(actions)
+
+
+
+parser = argparse.ArgumentParser(prog="ds4drv",
+                                 formatter_class=SortingHelpFormatter)
 parser.add_argument("--version", action="version",
                     version="%(prog)s {0}".format(__version__))
 
