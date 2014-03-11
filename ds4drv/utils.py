@@ -38,6 +38,11 @@ def parse_button_combo(combo, sep="+"):
     return tuple(map(button_prefix, combo.lower().split(sep)))
 
 
+def with_metaclass(meta, base=object):
+    """Create a base class with a metaclass."""
+    return meta("NewBase", (base,), {})
+
+
 def zero_copy_slice(buf, start=None, end=None):
     # No need for an extra copy on Python 3.3+
     if sys.version_info[0] == 3 and sys.version_info[1] >= 3:

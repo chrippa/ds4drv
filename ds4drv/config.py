@@ -23,7 +23,10 @@ DAEMON_PID_FILE = "/tmp/ds4drv.pid"
 
 class SortingHelpFormatter(argparse.HelpFormatter):
     def add_argument(self, action):
-        action.help = action.help.capitalize()
+        # Force the built in options to be capitalized
+        if action.option_strings[-1] in ("--version", "--help"):
+            action.help = action.help.capitalize()
+
         super(SortingHelpFormatter, self).add_argument(action)
         self.add_text("")
 
@@ -36,7 +39,6 @@ class SortingHelpFormatter(argparse.HelpFormatter):
         super(SortingHelpFormatter, self).add_arguments(actions)
 
 
-
 parser = argparse.ArgumentParser(prog="ds4drv",
                                  formatter_class=SortingHelpFormatter)
 parser.add_argument("--version", action="version",
@@ -45,22 +47,22 @@ parser.add_argument("--version", action="version",
 configopt = parser.add_argument_group("configuration options")
 configopt.add_argument("--config", metavar="filename",
                        type=os.path.expanduser,
-                       help="configuration file to read settings from. "
+                       help="Configuration file to read settings from. "
                             "Default is ~/.config/ds4drv.conf or "
                             "/etc/ds4drv.conf, whichever is found first")
 
 backendopt = parser.add_argument_group("backend options")
 backendopt.add_argument("--hidraw", action="store_true",
-                        help="use hidraw devices. This can be used to access "
+                        help="Use hidraw devices. This can be used to access "
                              "USB and paired bluetooth devices. Note: "
                              "Bluetooth devices does currently not support "
                              "any LED functionality")
 
 daemonopt = parser.add_argument_group("daemon options")
 daemonopt.add_argument("--daemon", action="store_true",
-                       help="run in the background as a daemon")
+                       help="Run in the background as a daemon")
 daemonopt.add_argument("--daemon-log", default=DAEMON_LOG_FILE, metavar="file",
-                       help="log file to create in daemon mode")
+                       help="Log file to create in daemon mode")
 daemonopt.add_argument("--daemon-pid", default=DAEMON_PID_FILE, metavar="file",
                        help="PID file to create in daemon mode")
 
@@ -152,6 +154,8 @@ class ControllerAction(argparse.Action):
 
         namespace.controllers.append(controller)
 
+controllopt.add_argument("--next-controller", nargs=0, action=ControllerAction,
+                         help="Creates another controller")
 
 def hexcolor(color):
     color = color.strip("#")
@@ -242,47 +246,9 @@ def add_controller_option(name, **options):
     ControllerAction.__options__.append(option_name)
 
 
-add_controller_option("--battery-flash", action="store_true",
-                      help="flashes the LED once a minute if the "
-                           "battery is low")
-add_controller_option("--emulate-xboxdrv", action="store_true",
-                      help="emulates the same joystick layout as a "
-                           "Xbox 360 controller used via xboxdrv")
-add_controller_option("--emulate-xpad", action="store_true",
-                      help="emulates the same joystick layout as a wired "
-                           "Xbox 360 controller used via the xpad module")
-add_controller_option("--emulate-xpad-wireless", action="store_true",
-                      help="emulates the same joystick layout as a wireless "
-                           "Xbox 360 controller used via the xpad module")
-add_controller_option("--ignored-buttons", metavar="button(s)",
-                      type=buttoncombo(","), default=[],
-                      help="a comma-separated list of buttons to never send "
-                           "as joystick events. For example specify 'PS' to "
-                           "disable Steam's big picture mode shortcut when "
-                           "using the --emulate-* options")
-add_controller_option("--led", metavar="color", default="0000ff",
-                      type=hexcolor,
-                      help="sets color of the LED. Uses hex color codes, "
-                           "e.g. 'ff0000' is red. Default is '0000ff' (blue)")
-add_controller_option("--bindings", metavar="bindings",
-                      help="use custom action bindings specified in the "
-                           "config file")
-add_controller_option("--mapping", metavar="mapping",
-                      help="use a custom button mapping specified in the "
-                           "config file")
-add_controller_option("--profile-toggle", metavar="button(s)",
-                      type=buttoncombo("+"),
-                      help="a button combo that will trigger profile "
-                           "cycling, e.g. 'R1+L1+PS'")
 add_controller_option("--profiles", metavar="profiles",
                       type=stringlist,
-                      help="profiles to cycle through using the button "
+                      help="Profiles to cycle through using the button "
                            "specified by --profile-toggle, e.g. "
                            "'profile1,profile2'")
-add_controller_option("--trackpad-mouse", action="store_true",
-                      help="makes the trackpad control the mouse")
-add_controller_option("--dump-reports", action="store_true",
-                      help="prints controller input reports")
-controllopt.add_argument("--next-controller", nargs=0, action=ControllerAction,
-                         help="creates another controller")
 

@@ -2,27 +2,12 @@ import sys
 
 from threading import Thread
 
-from .actions import (ActionLED,
-                      ReportActionBattery,
-                      ReportActionBinding,
-                      ReportActionBluetoothSignal,
-                      ReportActionDump,
-                      ReportActionInput,
-                      ReportActionStatus)
+from .actions import ActionRegistry
 from .backends import BluetoothBackend, HidrawBackend
 from .config import load_options
 from .daemon import Daemon
 from .eventloop import EventLoop
 from .exceptions import BackendError
-
-
-ACTIONS = (ActionLED,
-           ReportActionBattery,
-           ReportActionBinding,
-           ReportActionBluetoothSignal,
-           ReportActionDump,
-           ReportActionInput,
-           ReportActionStatus)
 
 
 class DS4Controller(object):
@@ -35,7 +20,7 @@ class DS4Controller(object):
         self.device = None
         self.loop = EventLoop()
 
-        self.actions = [cls(self) for cls in ACTIONS]
+        self.actions = [cls(self) for cls in ActionRegistry.actions]
         self.bindings = options.parent.bindings
         self.current_profile = "default"
         self.default_profile = options

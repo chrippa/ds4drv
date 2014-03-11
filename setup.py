@@ -16,7 +16,10 @@ setup(name="ds4drv",
       entry_points={
         "console_scripts": ["ds4drv=ds4drv.__main__:main"]
       },
-      packages=["ds4drv", "ds4drv.backends", "ds4drv.packages"],
+      packages=["ds4drv",
+                "ds4drv.actions",
+                "ds4drv.backends",
+                "ds4drv.packages"],
       install_requires=["evdev>=0.3.0", "pyudev>=0.16"],
       classifiers=[
         "Development Status :: 4 - Beta",
