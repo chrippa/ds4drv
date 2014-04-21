@@ -1,5 +1,7 @@
 import os.path
 
+from datetime import datetime, timedelta
+
 from collections import namedtuple
 
 from evdev import UInput, UInputError, ecodes
@@ -20,6 +22,9 @@ UInputMapping = namedtuple("UInputMapping",
 
 _mappings = {}
 
+# Add our simulated mousewheel codes
+ecodes.REL_WHEELUP = 13      # Unique value for this lib
+ecodes.REL_WHEELDOWN = 14    # Ditto
 
 def parse_button(attr):
     if attr[0] in BUTTON_MODIFIERS:
@@ -261,7 +266,11 @@ class UInputDevice(object):
             )
 
             for name in layout.mouse:
-                events[ecodes.EV_REL].append(name)
+                if name in (ecodes.REL_WHEELUP, ecodes.REL_WHEELDOWN):
+                    if ecodes.REL_WHEEL not in events[ecodes.EV_REL]:
+                        events[ecodes.EV_REL].append(ecodes.REL_WHEEL)
+                else:
+                    events[ecodes.EV_REL].append(name)
                 self.mouse_rel[name] = 0.0
 
         self.device = UInput(name=layout.name, events=events,
@@ -285,6 +294,7 @@ class UInputDevice(object):
 
         for name, attr in self.layout.buttons.items():
             attr, modifier = attr
+            code = ecodes.EV_KEY
 
             if attr in self.ignored_buttons:
                 value = False
@@ -297,7 +307,7 @@ class UInputDevice(object):
                 elif modifier == "-":
                     value = value < (128 - DEFAULT_A2D_DEADZONE)
 
-            self.write_event(ecodes.EV_KEY, name, value)
+            self.write_event(code, name, value)
 
         for name, attr in self.layout.hats.items():
             if getattr(report, attr[0]):
@@ -327,6 +337,7 @@ class UInputDevice(object):
 
     def emit_mouse(self, report):
         """Calculates relative mouse values from a report and writes them."""
+        scroll_wait = timedelta(milliseconds=250)
         for name, attr in self.layout.mouse.items():
             if attr.startswith("trackpad_touch"):
                 active_attr = attr[:16] + "active"
@@ -353,6 +364,36 @@ class UInputDevice(object):
                 sensitivity = self.mouse_analog_sensitivity
                 self.mouse_rel[name] += accel * sensitivity
 
+            # Emulate mouse wheel (needs special handling)
+            if name in (ecodes.REL_WHEELUP, ecodes.REL_WHEELDOWN):
+                code = ecodes.REL_WHEEL # The real event we need to emit
+                write = False
+                last_write = self._write_cache.get(name, None)
+                if not last_write:
+                    write = True
+                    self._write_cache[name+1000] = 0 # Used for key repeat
+                if getattr(report, attr):
+                    now = datetime.now()
+                    if name == ecodes.REL_WHEELUP:
+                        value = 1
+                    elif name == ecodes.REL_WHEELDOWN:
+                        value = -1
+                    if last_write:
+                        if self._write_cache[name+1000] > 1:
+                            write = True
+                        elif now - last_write > scroll_wait:
+                            write = True
+                    if write:
+                        self.device.write(ecodes.EV_REL, code, value)
+                        self.device.syn()
+                        self._write_cache[name] = now
+                        self._write_cache[name+1000] += 1
+                        return # No need to proceed further
+                else:
+                    # Reset so you can quickly tap the button to scroll
+                    self._write_cache[name] = False
+                    self._write_cache[name+1000] = 0
+
             rel = int(self.mouse_rel[name])
             self.mouse_rel[name] = self.mouse_rel[name] - rel
             self.device.write(ecodes.EV_REL, name, rel)
@@ -378,9 +419,10 @@ def parse_uinput_mapping(name, mapping):
     """Parses a dict of mapping options."""
     axes, buttons, mouse, mouse_options = {}, {}, {}, {}
     description = "ds4drv custom mapping ({0})".format(name)
-
     for key, attr in mapping.items():
         key = key.upper()
+        if '#' in attr: # Remove tailing comments on the line
+            attr = attr.split('#', 1)[0].rstrip()
         if key.startswith("BTN_") or key.startswith("KEY_"):
             buttons[key] = attr
         elif key.startswith("ABS_"):
