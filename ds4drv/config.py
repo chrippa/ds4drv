@@ -229,6 +229,10 @@ def load_options():
 
     for name, section in config.sections("mapping"):
         mapping = config.section(section)
+        for key, attr in mapping.items():
+            if '#' in attr: # Remove tailing comments on the line
+                attr = attr.split('#', 1)[0].rstrip()
+                mapping[key] = attr
         parse_uinput_mapping(name, mapping)
 
     for controller in options.controllers:
