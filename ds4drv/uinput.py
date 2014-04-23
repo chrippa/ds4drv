@@ -1,4 +1,5 @@
 import os.path
+import time
 
 from collections import namedtuple
 
@@ -12,6 +13,8 @@ DEFAULT_A2D_DEADZONE = 50
 DEFAULT_AXIS_OPTIONS = (0, 255, 0, 5)
 DEFAULT_MOUSE_SENSITIVTY = 0.6
 DEFAULT_MOUSE_DEADZONE = 5
+DEFAULT_SCROLL_REPEAT_DELAY = .250 # Seconds to wait before continual scrolling
+DEFAULT_SCROLL_DELAY = .035        # Seconds to wait between scroll events
 
 UInputMapping = namedtuple("UInputMapping",
                            "name bustype vendor product version "
@@ -19,6 +22,10 @@ UInputMapping = namedtuple("UInputMapping",
                            "mouse_options")
 
 _mappings = {}
+
+# Add our simulated mousewheel codes
+ecodes.REL_WHEELUP = 13      # Unique value for this lib
+ecodes.REL_WHEELDOWN = 14    # Ditto
 
 
 def parse_button(attr):
@@ -227,6 +234,7 @@ class UInputDevice(object):
         self.create_device(layout)
 
         self._write_cache = {}
+        self._scroll_details = {}
 
     def create_device(self, layout):
         """Creates a uinput device using the specified layout."""
@@ -259,9 +267,22 @@ class UInputDevice(object):
                 layout.mouse_options.get("MOUSE_DEADZONE",
                                          DEFAULT_MOUSE_DEADZONE)
             )
+            self.scroll_repeat_delay = float(
+                layout.mouse_options.get("MOUSE_SCROLL_REPEAT_DELAY",
+                                         DEFAULT_SCROLL_REPEAT_DELAY)
+            )
+            self.scroll_delay = float(
+                layout.mouse_options.get("MOUSE_SCROLL_DELAY",
+                                         DEFAULT_SCROLL_DELAY)
+            )
 
             for name in layout.mouse:
-                events[ecodes.EV_REL].append(name)
+                if name in (ecodes.REL_WHEELUP, ecodes.REL_WHEELDOWN):
+                    if ecodes.REL_WHEEL not in events[ecodes.EV_REL]:
+                        # This ensures that scroll wheel events can work
+                        events[ecodes.EV_REL].append(ecodes.REL_WHEEL)
+                else:
+                    events[ecodes.EV_REL].append(name)
                 self.mouse_rel[name] = 0.0
 
         self.device = UInput(name=layout.name, events=events,
@@ -352,6 +373,40 @@ class UInputDevice(object):
 
                 sensitivity = self.mouse_analog_sensitivity
                 self.mouse_rel[name] += accel * sensitivity
+
+            # Emulate mouse wheel (needs special handling)
+            if name in (ecodes.REL_WHEELUP, ecodes.REL_WHEELDOWN):
+                ecode = ecodes.REL_WHEEL # The real event we need to emit
+                write = False
+                if getattr(report, attr):
+                    self._scroll_details['direction'] = name
+                    now = time.time()
+                    last_write = self._scroll_details.get('last_write')
+                    if not last_write:
+                        # No delay for the first button press for fast feedback
+                        write = True
+                        self._scroll_details['count'] = 0
+                    if name == ecodes.REL_WHEELUP:
+                        value = 1
+                    elif name == ecodes.REL_WHEELDOWN:
+                        value = -1
+                    if last_write:
+                        # Delay at least one cycle before continual scrolling
+                        if self._scroll_details['count'] > 1:
+                            if now - last_write > self.scroll_delay:
+                                write = True
+                        elif now - last_write > self.scroll_repeat_delay:
+                            write = True
+                    if write:
+                        self.device.write(ecodes.EV_REL, ecode, value)
+                        self._scroll_details['last_write'] = now
+                        self._scroll_details['count'] += 1
+                        continue # No need to proceed further
+                else:
+                    # Reset so you can quickly tap the button to scroll
+                    if self._scroll_details.get('direction') == name:
+                        self._scroll_details['last_write'] = 0
+                        self._scroll_details['count'] = 0
 
             rel = int(self.mouse_rel[name])
             self.mouse_rel[name] = self.mouse_rel[name] - rel
