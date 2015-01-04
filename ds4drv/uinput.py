@@ -55,6 +55,57 @@ def create_mapping(name, description, bustype=0, vendor=0, product=0,
 
 # Pre-configued mappings
 create_mapping(
+    "ds4drv", "Sony Computer Entertainment Wireless Controller (Userspace)",
+    # Bus type,     vendor, product, version
+    ecodes.BUS_USB, 1356,   1476,    273,
+    # Axes
+    {
+        "ABS_X":        "left_analog_x",
+        "ABS_Y":        "left_analog_y",
+        "ABS_RX":       "right_analog_x",
+        "ABS_RY":       "right_analog_y",
+        "ABS_Z":        "l2_analog",
+        "ABS_RZ":       "r2_analog",
+        "ABS_THROTTLE": "orientation_roll",
+        "ABS_RUDDER":   "orientation_pitch",
+        "ABS_WHEEL":    "orientation_yaw",
+        "ABS_DISTANCE": "motion_z",
+        "ABS_TILT_X":   "motion_x",
+        "ABS_TILT_Y":   "motion_y",
+    },
+    # Axes options
+    {
+        "ABS_THROTTLE": (-16385, 16384, 0, 0),
+        "ABS_RUDDER":   (-16385, 16384, 0, 0),
+        "ABS_WHEEL":    (-16385, 16384, 0, 0),
+        "ABS_DISTANCE": (-32768, 32767, 0, 10),
+        "ABS_TILT_X":   (-32768, 32767, 0, 10),
+        "ABS_TILT_Y":   (-32768, 32767, 0, 10),
+    },
+    # Buttons
+    {
+        "BTN_START":  "button_options",
+        "BTN_MODE":   "button_ps",
+        "BTN_SELECT": "button_share",
+        "BTN_A":      "button_cross",
+        "BTN_B":      "button_circle",
+        "BTN_X":      "button_square",
+        "BTN_Y":      "button_triangle",
+        "BTN_TL":     "button_l1",
+        "BTN_TR":     "button_r1",
+        "BTN_THUMBL": "button_l3",
+        "BTN_THUMBR": "button_r3",
+    },
+
+    # Hats
+    {
+        "ABS_HAT0X": ("dpad_left", "dpad_right"),
+        "ABS_HAT0Y": ("dpad_up", "dpad_down")
+    },
+)
+
+# Emulate the way the kernel does it
+create_mapping(
     "ds4", "Sony Computer Entertainment Wireless Controller",
     # Bus type,     vendor, product, version
     ecodes.BUS_USB, 1356,   1476,    273,
@@ -106,6 +157,7 @@ create_mapping(
     }
 )
 
+# Emulate xboxdrv's button assignments.
 create_mapping(
     "xboxdrv", "Xbox Gamepad (userspace driver)",
     # Bus type, vendor, product, version
@@ -142,6 +194,7 @@ create_mapping(
     }
 )
 
+# Emulate the way the kernel does Xbox 360/Xbone controllers with xpad
 create_mapping(
     "xpad", "Microsoft X-Box 360 pad",
     # Bus type,      vendor, product, version
@@ -178,6 +231,7 @@ create_mapping(
     }
 )
 
+# Emulate the way the kernel does Xbox 360 Wireless controllers with xpad
 create_mapping(
     "xpad_wireless", "Xbox 360 Wireless Receiver",
     # Bus type,      vendor, product, version
