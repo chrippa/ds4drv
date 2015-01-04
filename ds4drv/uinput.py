@@ -27,7 +27,6 @@ _mappings = {}
 ecodes.REL_WHEELUP = 13      # Unique value for this lib
 ecodes.REL_WHEELDOWN = 14    # Ditto
 
-
 def parse_button(attr):
     if attr[0] in BUTTON_MODIFIERS:
         modifier = attr[0]
@@ -282,10 +281,10 @@ create_mapping(
     },
     mouse={
         
-        "REL_X": "trackpad_touch0_x",
-        "REL_Y": "trackpad_touch0_y",
-        "REL_MT_X" : "trackpad_touch1_x",
-        "REL_MT_Y" : "trackpad_touch1_y"
+        "REL_X"  : "trackpad_touch0_x",
+        "REL_Y"  : "trackpad_touch0_y",
+        "REL_RX" : "trackpad_touch1_x",
+        "REL_RY" : "trackpad_touch1_y"
     },
 )
 
