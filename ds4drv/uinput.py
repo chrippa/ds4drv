@@ -52,8 +52,62 @@ def create_mapping(name, description, bustype=0, vendor=0, product=0,
                             mouse_options)
     _mappings[name] = mapping
 
-
+    
 # Pre-configued mappings
+# Emulate it the (mostly) correct way
+create_mapping(
+    "ds4drv", "Sony Computer Entertainment Wireless Controller (Userspace)",
+    # Bus type,     vendor, product, version
+    ecodes.BUS_USB, 1356,   1476,    273,
+    # Axes
+    {
+        "ABS_X":        "left_analog_x",
+        "ABS_Y":        "left_analog_y",
+        "ABS_RX":       "right_analog_x",
+        "ABS_RY":       "right_analog_y",
+        "ABS_Z":        "l2_analog",
+        "ABS_RZ":       "r2_analog",
+        "ABS_THROTTLE": "orientation_roll",
+        "ABS_RUDDER":   "orientation_pitch",
+        "ABS_WHEEL":    "orientation_yaw",
+        "ABS_DISTANCE": "motion_z",
+        "ABS_TILT_X":   "motion_x",
+        "ABS_TILT_Y":   "motion_y",
+    },
+    # Axes options
+    {
+        "ABS_THROTTLE": (-16385, 16384, 0, 0),
+        "ABS_RUDDER":   (-16385, 16384, 0, 0),
+        "ABS_WHEEL":    (-16385, 16384, 0, 0),
+        "ABS_DISTANCE": (-32768, 32767, 0, 10),
+        "ABS_TILT_X":   (-32768, 32767, 0, 10),
+        "ABS_TILT_Y":   (-32768, 32767, 0, 10),
+    },
+    # Buttons
+    {
+        "BTN_START":  "button_options",
+        "BTN_MODE":   "button_ps",
+        "BTN_SELECT": "button_share",
+        "BTN_A":      "button_cross",
+        "BTN_B":      "button_circle",
+        "BTN_X":      "button_square",
+        "BTN_Y":      "button_triangle",
+        "BTN_TL":     "button_l1",
+        "BTN_TR":     "button_r1",
+        "BTN_THUMBL": "button_l3",
+        "BTN_THUMBR": "button_r3",
+        
+    },
+    
+    # Hats
+    {
+        "ABS_HAT0X": ("dpad_left", "dpad_right"),
+        "ABS_HAT0Y": ("dpad_up", "dpad_down")
+    },
+        
+)
+
+#Emulate the way the kernel does it
 create_mapping(
     "ds4", "Sony Computer Entertainment Wireless Controller",
     # Bus type,     vendor, product, version
@@ -104,8 +158,10 @@ create_mapping(
         "ABS_HAT0X": ("dpad_left", "dpad_right"),
         "ABS_HAT0Y": ("dpad_up", "dpad_down")
     }
+    
 )
 
+#Emulate xboxdrv's button assignments.
 create_mapping(
     "xboxdrv", "Xbox Gamepad (userspace driver)",
     # Bus type, vendor, product, version
@@ -142,6 +198,7 @@ create_mapping(
     }
 )
 
+# Emulate the way the kernel does Xbox 360/Xbone controllers with xpad
 create_mapping(
     "xpad", "Microsoft X-Box 360 pad",
     # Bus type,      vendor, product, version
@@ -178,6 +235,7 @@ create_mapping(
     }
 )
 
+#Emulate the way the kernel does Xbox 360 Wireless controllers with xpad
 create_mapping(
     "xpad_wireless", "Xbox 360 Wireless Receiver",
     # Bus type,      vendor, product, version
@@ -214,14 +272,20 @@ create_mapping(
     },
 )
 
+#Emulate a multi-touch trackpad
 create_mapping(
     "mouse", "DualShock4 Mouse Emulation",
     buttons={
         "BTN_LEFT": "button_trackpad",
+        "BTN_TOOL_FINGER" : "trackpad_touch0_active",
+        "BTN_TOOL_DOUBLETAP" : "trackpad_touch1_active"
     },
     mouse={
+        
         "REL_X": "trackpad_touch0_x",
-        "REL_Y": "trackpad_touch0_y"
+        "REL_Y": "trackpad_touch0_y",
+        "REL_MT_X" : "trackpad_touch1_x",
+        "REL_MT_Y" : "trackpad_touch1_y"
     },
 )
 
@@ -372,8 +436,9 @@ class UInputDevice(object):
                     continue
 
                 sensitivity = self.mouse_analog_sensitivity
-                self.mouse_rel[name] += accel * sensitivity
+                self.mouse_rel[name] += accel * sensitivity  
 
+                
             # Emulate mouse wheel (needs special handling)
             if name in (ecodes.REL_WHEELUP, ecodes.REL_WHEELDOWN):
                 ecode = ecodes.REL_WHEEL # The real event we need to emit
@@ -407,6 +472,7 @@ class UInputDevice(object):
                     if self._scroll_details.get('direction') == name:
                         self._scroll_details['last_write'] = 0
                         self._scroll_details['count'] = 0
+               
 
             rel = int(self.mouse_rel[name])
             self.mouse_rel[name] = self.mouse_rel[name] - rel
