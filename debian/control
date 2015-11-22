@@ -1,0 +1,23 @@
+Source: ds4drv
+Section: utils
+Priority: optional
+Maintainer: SteamOS-Tools Signing Key <mdeguzis@gmail.com>
+Build-Depends:	debhelper (>= 9),
+		dh-systemd,
+		dh-python,
+		python,
+		python-setuptools,
+		python-dev,
+Standards-Version: 3.9.5
+Homepage: https://github.com/chrippa/ds4drv
+
+Package:ds4drv
+Architecture: all
+Depends: ${shlibs:Depends},
+	 ${misc:Depends},
+	 bluez-tools,
+	 python-pyudev,
+	 python-evdev,
+	 python-setuptools
+Description: ds4drv is a Sony DualShock 4 userspace driver for Linux.
+ This package installs ds4drv for SteamOS Brewmaster users.
