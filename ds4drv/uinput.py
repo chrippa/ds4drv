@@ -4,8 +4,14 @@ import time
 from collections import namedtuple
 
 from evdev import UInput, UInputError, ecodes
+from evdev import util
 
 from .exceptions import DeviceError
+
+# Check for the existence of a "resolve_ecodes_dict" function.
+# Need to know if axis options tuples should be altered.
+# This is needed to keep the code compatible with python-evdev < 0.6.0.
+absInfoUsesValue = hasattr(util, "resolve_ecodes_dict")
 
 BUTTON_MODIFIERS = ("+", "-")
 
@@ -75,12 +81,12 @@ create_mapping(
     },
     # Axes options
     {
-        "ABS_THROTTLE": (-16385, 16384, 0, 0),
-        "ABS_RUDDER":   (-16385, 16384, 0, 0),
-        "ABS_WHEEL":    (-16385, 16384, 0, 0),
-        "ABS_DISTANCE": (-32768, 32767, 0, 10),
-        "ABS_TILT_X":   (-32768, 32767, 0, 10),
-        "ABS_TILT_Y":   (-32768, 32767, 0, 10),
+        "ABS_THROTTLE": (0, -16385, 16384, 0, 0),
+        "ABS_RUDDER":   (0, -16385, 16384, 0, 0),
+        "ABS_WHEEL":    (0, -16385, 16384, 0, 0),
+        "ABS_DISTANCE": (0, -32768, 32767, 0, 10),
+        "ABS_TILT_X":   (0, -32768, 32767, 0, 10),
+        "ABS_TILT_Y":   (0, -32768, 32767, 0, 10),
     },
     # Buttons
     {
@@ -247,10 +253,14 @@ class UInputDevice(object):
 
         for name in layout.axes:
             params = layout.axes_options.get(name, DEFAULT_AXIS_OPTIONS)
+            if not absInfoUsesValue:
+                params = (params[0],) + params[2:]
             events[ecodes.EV_ABS].append((name, params))
 
         for name in layout.hats:
-            params = (-1, 1, 0, 0)
+            params = (0, -1, 1, 0, 0)
+            if not absInfoUsesValue:
+                params = params[1:]
             events[ecodes.EV_ABS].append((name, params))
 
         for name in layout.buttons:
