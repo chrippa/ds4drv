@@ -16,7 +16,7 @@ absInfoUsesValue = hasattr(util, "resolve_ecodes_dict")
 BUTTON_MODIFIERS = ("+", "-")
 
 DEFAULT_A2D_DEADZONE = 50
-DEFAULT_AXIS_OPTIONS = (0, 255, 0, 5)
+DEFAULT_AXIS_OPTIONS = (0, 0, 255, 0, 5)
 DEFAULT_MOUSE_SENSITIVTY = 0.6
 DEFAULT_MOUSE_DEADZONE = 5
 DEFAULT_SCROLL_REPEAT_DELAY = .250 # Seconds to wait before continual scrolling
