@@ -254,7 +254,7 @@ class UInputDevice(object):
         for name in layout.axes:
             params = layout.axes_options.get(name, DEFAULT_AXIS_OPTIONS)
             if not absInfoUsesValue:
-                params = (params[0],) + params[2:]
+                params = params[1:]
             events[ecodes.EV_ABS].append((name, params))
 
         for name in layout.hats:
