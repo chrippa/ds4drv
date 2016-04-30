@@ -2,6 +2,13 @@
 Release history
 ---------------
 
+0.5.1 (2016-04-30)
+^^^^^^^^^^^^^^^^^^
+
+- Fixed compatibility with python-evdev 0.6.0 (#70)
+- Fixed spurious input from unconnected devices (#59)
+
+
 0.5.0 (2014-03-07)
 ^^^^^^^^^^^^^^^^^^
 
