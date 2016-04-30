@@ -241,6 +241,7 @@ class UInputDevice(object):
 
         self._write_cache = {}
         self._scroll_details = {}
+        self.emit_reset()
 
     def create_device(self, layout):
         """Creates a uinput device using the specified layout."""
