@@ -51,7 +51,7 @@ def create_mapping(name, description, bustype=0, vendor=0, product=0,
     axes_options = {getattr(ecodes, k): v for k,v in axes_options.items()}
     buttons = {getattr(ecodes, k): parse_button(v) for k,v in buttons.items()}
     hats = {getattr(ecodes, k): v for k,v in hats.items()}
-    mouse = {getattr(ecodes, k): v for k,v in mouse.items()}
+    mouse = {getattr(ecodes, k): parse_button(v) for k,v in mouse.items()}
 
     mapping = UInputMapping(description, bustype, vendor, product, version,
                             axes, axes_options, buttons, hats, keys, mouse,
@@ -360,6 +360,10 @@ class UInputDevice(object):
     def emit_mouse(self, report):
         """Calculates relative mouse values from a report and writes them."""
         for name, attr in self.layout.mouse.items():
+            # If the attr is a tuple like (left_analog_y, "-")
+            # then set the attr to just be the first item
+            attr, modifier = attr
+
             if attr.startswith("trackpad_touch"):
                 active_attr = attr[:16] + "active"
                 if not getattr(report, active_attr):
@@ -381,6 +385,11 @@ class UInputDevice(object):
                     accel = (pos - 128) / 10
                 else:
                     continue
+
+                # If a minus modifier has been given then minus the acceleration
+                # to invert the direction.
+                if (modifier and modifier == "-"):
+                    accel = -accel
 
                 sensitivity = self.mouse_analog_sensitivity
                 self.mouse_rel[name] += accel * sensitivity
