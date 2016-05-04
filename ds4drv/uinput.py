@@ -347,7 +347,7 @@ class UInputDevice(object):
         """Resets the device to a blank state."""
         for name in self.layout.axes:
             params = self.layout.axes_options.get(name, DEFAULT_AXIS_OPTIONS)
-            self.write_event(ecodes.EV_ABS, name, int(sum(params[:2]) / 2))
+            self.write_event(ecodes.EV_ABS, name, int(sum(params[1:3]) / 2))
 
         for name in self.layout.buttons:
             self.write_event(ecodes.EV_KEY, name, False)
