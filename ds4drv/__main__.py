@@ -1,4 +1,5 @@
 import sys
+import signal
 
 from threading import Thread
 
@@ -108,26 +109,50 @@ class DS4Controller(object):
     def run(self):
         self.loop.run()
 
-    def exit(self, *args):
+    def exit(self, *args, error = True):
         if self.device:
             self.cleanup_device()
 
-        self.logger.error(*args)
-        self.error = True
+        if error == True:
+            self.logger.error(*args)
+            self.error = True
+        else:
+            self.logger.info(*args)
 
 
 def create_controller_thread(index, controller_options, dynamic=False):
     controller = DS4Controller(index, controller_options, dynamic=dynamic)
 
     thread = Thread(target=controller.run)
-    thread.daemon = True
     thread.controller = controller
     thread.start()
 
     return thread
 
 
+class SigintHandler(object):
+    def __init__(self, threads):
+        self.threads = threads
+
+    def cleanup_controller_threads(self):
+        for thread in self.threads:
+            thread.controller.exit("Cleaning up...", error=False)
+            thread.controller.loop.stop()
+            thread.join()
+
+    def __call__(self, signum, frame):
+        signal.signal(signum, signal.SIG_DFL)
+
+        self.cleanup_controller_threads()
+        sys.exit(0)
+
+
 def main():
+    threads = []
+
+    sigint_handler = SigintHandler(threads)
+    signal.signal(signal.SIGINT, sigint_handler)
+
     try:
         options = load_options()
     except ValueError as err:
@@ -146,7 +171,6 @@ def main():
     if options.daemon:
         Daemon.fork(options.daemon_log, options.daemon_pid)
 
-    threads = []
     for index, controller_options in enumerate(options.controllers):
         thread = create_controller_thread(index + 1, controller_options)
         threads.append(thread)

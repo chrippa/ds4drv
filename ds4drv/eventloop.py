@@ -47,6 +47,10 @@ class EventLoop(object):
     def __init__(self):
         self.stop()
 
+        # Timeout value well over the expected controller poll time, but
+        # short enough for ds4drv to shut down in a reasonable time.
+        self.epoll_timeout = 1
+
     def create_timer(self, interval, callback):
         """Creates a timer."""
 
@@ -95,7 +99,7 @@ class EventLoop(object):
         """Starts the loop."""
         self.running = True
         while self.running:
-            for fd, event in self.epoll.poll():
+            for fd, event in self.epoll.poll(self.epoll_timeout):
                 callback = self.callbacks.get(fd)
                 if callback:
                     callback()
