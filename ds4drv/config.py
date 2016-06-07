@@ -52,11 +52,12 @@ configopt.add_argument("--config", metavar="filename",
                             "/etc/ds4drv.conf, whichever is found first")
 
 backendopt = parser.add_argument_group("backend options")
-backendopt.add_argument("--hidraw", action="store_true",
+backendopt.add_argument("--hidraw", action="store_true", dest="hidraw",
                         help="Use hidraw devices. This can be used to access "
                              "USB and paired bluetooth devices. Note: "
                              "Bluetooth devices does currently not support "
                              "any LED functionality")
+backendopt.add_argument("--no-hidraw", action="store_false", dest="hidraw")
 
 daemonopt = parser.add_argument_group("daemon options")
 daemonopt.add_argument("--daemon", action="store_true",
@@ -191,28 +192,38 @@ def merge_options(src, dst, defaults):
 
 
 def load_options():
+    # Initial command line parse to get config files.
     options = parser.parse_args(sys.argv[1:] + ["--next-controller"])
 
+    # Get the configs from the config file, possibly found on the command line.
     config = Config()
     config_paths = options.config and (options.config,) or CONFIG_FILES
     for path in filter(os.path.exists, map(os.path.expanduser, config_paths)):
         config.load(path)
         break
 
-    config_args = config.section_to_args("ds4drv") + config.controllers()
-    config_options = parser.parse_args(config_args)
+    # Get the configs corresponding to general command line arguments.
+    # Store them in "options"
+    config_args = config.section_to_args("ds4drv")
+    parser.parse_args(config_args, namespace = options)
 
-    defaults, remaining_args = parser.parse_known_args(["--next-controller"])
-    merge_options(config_options, options, defaults)
+    # Parse the command line again, storing the results in "options",
+    # so command line arguments supersede config arguments.
+    # Discard controller data from original parse to avoid double counting.
+    options.controllers = []
+    parser.parse_args(sys.argv[1:] + ["--next-controller"], namespace = options)
 
+    # Merge config file and command line controller options.
     controller_defaults = ControllerAction.default_controller()
-    for idx, controller in enumerate(config_options.controllers):
+    config_controllers = parser.parse_args(config.controllers()).controllers
+    for idx, controller in enumerate(config_controllers):
         try:
             org_controller = options.controllers[idx]
             merge_options(controller, org_controller, controller_defaults)
         except IndexError:
             options.controllers.append(controller)
 
+    # Parse profile options
     options.profiles = {}
     for name, section in config.sections("profile"):
         args = config.section_to_args(section)
@@ -220,6 +231,7 @@ def load_options():
         profile_options.parent = options
         options.profiles[name] = profile_options
 
+    # Parse bindings options
     options.bindings = {}
     options.bindings["global"] = config.section("bindings",
                                                 key_type=parse_button_combo)
@@ -227,6 +239,7 @@ def load_options():
         options.bindings[name] = config.section(section,
                                                 key_type=parse_button_combo)
 
+    # Parse mapping options
     for name, section in config.sections("mapping"):
         mapping = config.section(section)
         for key, attr in mapping.items():
@@ -235,9 +248,11 @@ def load_options():
                 mapping[key] = attr
         parse_uinput_mapping(name, mapping)
 
+    # Fixup controller data
     for controller in options.controllers:
         controller.parent = options
 
+    # Fixup default_controller data
     options.default_controller = ControllerAction.default_controller()
     options.default_controller.parent = options
 
