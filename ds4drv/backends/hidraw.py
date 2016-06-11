@@ -1,6 +1,8 @@
 import fcntl
 import itertools
 import os
+import struct
+import signal
 
 from io import FileIO
 from time import sleep
@@ -62,14 +64,30 @@ class HidrawDS4Device(DS4Device):
 
         return fcntl.ioctl(self.fd, op, bytes(buf))
 
-    def write_report(self, report_id, data):
-        if self.type == "bluetooth":
-            # TODO: Add a check for a kernel that supports writing
-            # output reports when such a kernel has been released.
-            return
+    @staticmethod
+    def sigalrm_handler(signum, frame):
+        raise TimeoutError
 
-        hid = bytearray((report_id,))
-        self.fd.write(hid + data)
+    def write_report(self, report_id, data, timeout = None):
+        #if self.type == "bluetooth":
+        #    # TODO: Add a check for a kernel that supports writing
+        #    # output reports when such a kernel has been released.
+        #    return
+
+        #if timeout != None:
+        #    old_sigalrm_handler = signal.getsignal(signal.SIGALRM)
+        #    signal.signal(signal.SIGALRM, HidrawDS4Device.sigalrm_handler)
+        #    signal.setitimer(self.ITIMER_REAL, timeout)
+
+        try:
+            hid = bytearray((report_id,))
+            self.fd.write(hid + data)
+        except TimeoutError:
+            pass
+
+        #if timeout != None:
+        #    signal.setitimer(self.ITIMER_REAL, 0)
+        #    signal.signal(signal.SIGALRM, old_sigalrm_handler)
 
     def close(self):
         try:
@@ -85,8 +103,45 @@ class HidrawBluetoothDS4Device(HidrawDS4Device):
     report_size = 78
     valid_report_id = 0x11
 
+    audio_buffer_size = 448
+    audio_buffer = b''
+    frame_number = 0
+
     def set_operational(self):
         self.read_feature_report(0x02, 37)
+
+    def increment_frame_number(self, inc):
+            self.frame_number += inc
+            if self.frame_number > 0xffff:
+                    self.frame_number = 0
+
+    def play_audio(self, headers, data):
+        if len(self.audio_buffer) + len(data) <= self.audio_buffer_size:
+            self.audio_buffer += data
+            return
+
+        crc = b'\x00\x00\x00\x00'
+        audio_header = b'\x24'
+
+        self.increment_frame_number(4)
+
+        report_id = 0x17
+        report = (
+            b'\x40\xA0'
+            + struct.pack("<H", self.frame_number)
+            + audio_header
+            + self.audio_buffer
+            + bytearray(452 - len(self.audio_buffer)) + crc
+        )
+
+        self.audio_buffer = data
+
+        if self._volume_r == 0:
+            self.set_volume(60, 60, 0)
+            self._control()
+
+        maxtime = self.audio_buffer_size/headers.calculate_bit_rate()
+        self.write_report(report_id, report, maxtime)
 
 
 class HidrawUSBDS4Device(HidrawDS4Device):
