@@ -64,7 +64,7 @@ Using
 -----
 
 ds4drv has two different modes to find DS4 devices, decide which one to use
-depending on your use case. 
+depending on your use case.
 
 Raw bluetooth mode
 ^^^^^^^^^^^^^^^^^^
@@ -181,6 +181,30 @@ Known issues/limitations
 - No rumble support
 
 
+Troubleshooting
+---------------
+
+Check here for frequently encountered issues.
+
+Failed to create input device: "/dev/uinput" cannot be opened for writing
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+This could be because the uinput kernel module is not running on your
+computer. Doing ``lsmod | grep uinput`` should show if the module is loaded.
+If it is blank, run ``sudo modprobe uinput`` to load it. (The uinput module
+needs to be installed first. Please check with your distro's package
+manager.)
+
+To have the uinput module load on startup, you can add a file
+to ``/etc/modules-load.d``. For example:
+
+.. code-block:: bash
+
+    # in file /etc/modules-load.d/uinput.conf
+    # Load uinput module at boot
+    uinput
+
+
 References
 ----------
 
@@ -201,4 +225,3 @@ These resources have been very helpful when creating ds4drv:
   :target: http://dogecoin.com/
 
 |dogecoin| DCbQgDa4aEbm9QNm4ix6zYV9vMirUDQLNj
-
