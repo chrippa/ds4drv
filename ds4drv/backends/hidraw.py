@@ -199,7 +199,7 @@ class HidrawBluetoothDS4Device(HidrawDS4Device):
             self.set_volume(60, 60, 0)
             self._control()
 
-        maxtime = self.audio_buffer_size/headers.calculate_bit_rate()
+        maxtime = 0.1*self.audio_buffer_size/headers.calculate_bit_rate()
         #print("maxtime: ", maxtime)
         self.write_report(report_id, report, timeout = maxtime)
 

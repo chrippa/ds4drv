@@ -16,12 +16,15 @@
 
 
 void PulseaudioSBCStream::add_fd(int fd) {
-    eprintf("PulseaudioSBCStream::add_fd\n");
+    eprintf("PulseaudioSBCStream::add_fd %d\n", fd);
     this->fds.insert(fd);
+    eprintf("Num fds: %zu\n", this->fds.size());
 }
 
 void PulseaudioSBCStream::remove_fd(int fd) {
+    eprintf("PulseaudioSBCStream::remove_fd %d\n", fd);
     this->fds.erase(fd);
+    eprintf("Num fds: %zu\n", this->fds.size());
 }
 
 void PulseaudioSBCStream::stream_read_cb(

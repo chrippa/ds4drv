@@ -9,11 +9,11 @@ from .config import load_options
 from .daemon import Daemon
 from .eventloop import EventLoop
 from .exceptions import BackendError
-from .audio import pulseaudio_sbc_stream, StreamReader
+from .audio import PulseaudioSBCStream
 
 
 class DS4Controller(object):
-    def __init__(self, index, options, stream_reader, dynamic=False):
+    def __init__(self, index, options, sbc_stream, dynamic=False):
         self.index = index
         self.dynamic = dynamic
         self.logger = Daemon.logger.new_module("controller {0}".format(index))
@@ -34,7 +34,7 @@ class DS4Controller(object):
         if self.profiles:
             self.profiles.append("default")
 
-        self.stream_reader = stream_reader
+        self.sbc_stream = sbc_stream
 
         self.load_options(self.options)
 
@@ -123,9 +123,9 @@ class DS4Controller(object):
             self.logger.info(*args)
 
 
-def create_controller_thread(index, controller_options, stream_reader,
+def create_controller_thread(index, controller_options, sbc_stream,
                              dynamic=False):
-    controller = DS4Controller(index, controller_options, stream_reader,
+    controller = DS4Controller(index, controller_options, sbc_stream,
                                dynamic=dynamic)
 
     thread = Thread(target=controller.run)
@@ -136,9 +136,9 @@ def create_controller_thread(index, controller_options, stream_reader,
 
 
 class SigintHandler(object):
-    def __init__(self, threads, stream_reader):
+    def __init__(self, threads, sbc_stream):
         self.threads = threads
-        self.stream_reader = stream_reader
+        self.sbc_stream = sbc_stream
 
     def cleanup_controller_threads(self):
         for thread in self.threads:
@@ -146,10 +146,10 @@ class SigintHandler(object):
             thread.controller.loop.stop()
             thread.join()
 
-    def cleanup_stream_reader(self):
-        print("stopping stream_reader")
-        self.stream_reader.stop()
-        print("joining stream_reader thread")
+    def cleanup_sbc_stream(self):
+        print("stopping sbc_stream")
+        self.sbc_stream.stop()
+        print("joining sbc_stream thread")
         print("joined")
 
     def __call__(self, signum, frame):
@@ -157,7 +157,7 @@ class SigintHandler(object):
 
         print("Running SIGINT")
 
-        self.cleanup_stream_reader()
+        self.cleanup_sbc_stream()
         self.cleanup_controller_threads()
 
         sys.exit(0)
@@ -165,17 +165,17 @@ class SigintHandler(object):
 
 def main():
     threads = []
-    stream_reader = StreamReader(
+    sbc_stream = PulseaudioSBCStream(
         "ds4drv", "Test\\ ds4drv\\ sink"
     )
 
-    sigint_handler = SigintHandler(threads, stream_reader)
+    sigint_handler = SigintHandler(threads, sbc_stream)
     signal.signal(signal.SIGINT, sigint_handler)
 
-    #while stream_reader.sbc_frames_waiting() == False:
+    #while sbc_stream.sbc_frames_waiting() == False:
     #    import time
     #    time.sleep(1)
-    stream_reader.start()
+    sbc_stream.run()
 
 
     try:
@@ -198,7 +198,7 @@ def main():
 
     for index, controller_options in enumerate(options.controllers):
         thread = create_controller_thread(
-            index + 1, controller_options, stream_reader
+            index + 1, controller_options, sbc_stream
         )
         threads.append(thread)
 
@@ -227,7 +227,7 @@ def main():
         else:
             thread = create_controller_thread(len(threads) + 1,
                                               options.default_controller,
-                                              stream_reader,
+                                              sbc_stream,
                                               dynamic=True)
             threads.append(thread)
 
