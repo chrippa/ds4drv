@@ -136,7 +136,6 @@ void PulseaudioSBCStream::context_state_cb(pa_context* c, void* self_v) {
             c, "module-null-sink", options_buf, module_setup_cb, self_v
         );
         pa_operation_unref(op);
-        
     }
 }
 

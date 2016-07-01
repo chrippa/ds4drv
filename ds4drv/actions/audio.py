@@ -1,6 +1,5 @@
 from ..action import Action
 from ..audio import SBCHeaders
-from multiprocessing import RawArray, Manager
 from ..audio import pulseaudio_sbc_stream
 
 import os

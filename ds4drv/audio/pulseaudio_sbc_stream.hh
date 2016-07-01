@@ -17,7 +17,7 @@
 
 class PulseaudioSBCStream {
 public:
-    typedef PulseaudioSBCStream Self; 
+    typedef PulseaudioSBCStream Self;
 
     typedef std::function<
         void (

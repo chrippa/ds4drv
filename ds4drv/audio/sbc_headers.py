@@ -92,28 +92,6 @@ class SBCHeaders(object):
         return self.bit_rate
 
 
-    def gst_sbc_caps(self):
-
-        if self.channel_mode == SBCHeaders.MONO:
-            channel_mode_str = "mono"
-        elif self.channel_mode == SBCHeaders.DUAL_CHANNEL:
-            channel_mode_str = "dual"
-        elif self.channel_mode == SBCHeaders.STEREO:
-            channel_mode_str = "stereo"
-        elif self.channel_mode == SBCHeaders.JOINT_STEREO:
-            channel_mode_str = "joint"
-
-        return (
-            'audio/x-sbc, '
-            + 'channels=' +     str(self.nrof_channels) + ', '
-            + 'rate=' +         str(self.sampling_frequency) + ', '
-            + 'channel-mode=' + channel_mode_str + ', '
-            + 'blocks=' +       str(self.nrof_blocks) + ', '
-            + 'subbands=' +     str(self.nrof_subbands) + ', '
-            + 'bitpool=' +      str(self.bitpool)
-        )
-
-
     def parse_header(self, raw_header):
         # Info in SBC headers from
         # https://tools.ietf.org/html/draft-ietf-avt-rtp-sbc-01#section-6.3

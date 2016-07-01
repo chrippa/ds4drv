@@ -169,7 +169,6 @@ def main():
     sigint_handler = SigintHandler(controller_threads, sbc_stream)
     signal.signal(signal.SIGINT, sigint_handler)
 
-
     try:
         options = load_options()
     except ValueError as err:
