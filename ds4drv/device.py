@@ -161,9 +161,9 @@ class DS4Device(object):
         pkt[offset+9] = min(flash_led2, 255)
 
         if report_id == 0x11:
-            pkt[offset+18] = min(volume_l, 255)
-            pkt[offset+19] = min(volume_r, 255)
-            pkt[offset+21] = min(volume_speaker, 255)
+            pkt[offset+18] = min(volume_l, 100)
+            pkt[offset+19] = min(volume_r, 100)
+            pkt[offset+21] = min(volume_speaker, 100)
 
         self.write_report(report_id, pkt)
 
