@@ -9,11 +9,11 @@ from .config import load_options
 from .daemon import Daemon
 from .eventloop import EventLoop
 from .exceptions import BackendError
-from .audio import GstPulseToSBCPipeline
+from .audio import pulseaudio_sbc_stream, StreamReader
 
 
 class DS4Controller(object):
-    def __init__(self, index, options, audio_pipeline, dynamic=False):
+    def __init__(self, index, options, stream_reader, dynamic=False):
         self.index = index
         self.dynamic = dynamic
         self.logger = Daemon.logger.new_module("controller {0}".format(index))
@@ -34,7 +34,7 @@ class DS4Controller(object):
         if self.profiles:
             self.profiles.append("default")
 
-        self.audio_pipeline = audio_pipeline
+        self.stream_reader = stream_reader
 
         self.load_options(self.options)
 
@@ -123,9 +123,9 @@ class DS4Controller(object):
             self.logger.info(*args)
 
 
-def create_controller_thread(index, controller_options, audio_pipeline,
+def create_controller_thread(index, controller_options, stream_reader,
                              dynamic=False):
-    controller = DS4Controller(index, controller_options, audio_pipeline,
+    controller = DS4Controller(index, controller_options, stream_reader,
                                dynamic=dynamic)
 
     thread = Thread(target=controller.run)
@@ -136,9 +136,9 @@ def create_controller_thread(index, controller_options, audio_pipeline,
 
 
 class SigintHandler(object):
-    def __init__(self, threads, audio_pipeline):
+    def __init__(self, threads, stream_reader):
         self.threads = threads
-        self.audio_pipeline = audio_pipeline
+        self.stream_reader = stream_reader
 
     def cleanup_controller_threads(self):
         for thread in self.threads:
@@ -146,13 +146,18 @@ class SigintHandler(object):
             thread.controller.loop.stop()
             thread.join()
 
-    def cleanup_audio_pipeline(self):
-        self.audio_pipeline.stop()
+    def cleanup_stream_reader(self):
+        print("stopping stream_reader")
+        self.stream_reader.stop()
+        print("joining stream_reader thread")
+        print("joined")
 
     def __call__(self, signum, frame):
         signal.signal(signum, signal.SIG_DFL)
 
-        self.cleanup_audio_pipeline()
+        print("Running SIGINT")
+
+        self.cleanup_stream_reader()
         self.cleanup_controller_threads()
 
         sys.exit(0)
@@ -160,10 +165,18 @@ class SigintHandler(object):
 
 def main():
     threads = []
-    audio_pipeline = GstPulseToSBCPipeline()
+    stream_reader = StreamReader(
+        "ds4drv", "Test\\ ds4drv\\ sink"
+    )
 
-    sigint_handler = SigintHandler(threads, audio_pipeline)
+    sigint_handler = SigintHandler(threads, stream_reader)
     signal.signal(signal.SIGINT, sigint_handler)
+
+    #while stream_reader.sbc_frames_waiting() == False:
+    #    import time
+    #    time.sleep(1)
+    stream_reader.start()
+
 
     try:
         options = load_options()
@@ -185,19 +198,12 @@ def main():
 
     for index, controller_options in enumerate(options.controllers):
         thread = create_controller_thread(
-            index + 1, controller_options, audio_pipeline
+            index + 1, controller_options, stream_reader
         )
         threads.append(thread)
 
-    audio_pipeline.start()
-
     for device in backend.devices:
         print("-----")
-        from multiprocessing import Pool
-        p = Pool(processes=1)
-        def f(d):
-            print("f:", d)
-        p.apply_async(f, (device,))
         connected_devices = []
         for thread in threads:
             # Controller has received a fatal error, exit
@@ -221,7 +227,7 @@ def main():
         else:
             thread = create_controller_thread(len(threads) + 1,
                                               options.default_controller,
-                                              audio_pipeline,
+                                              stream_reader,
                                               dynamic=True)
             threads.append(thread)
 
