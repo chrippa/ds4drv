@@ -77,10 +77,27 @@ void PulseaudioSBCStream::setup_pulse_stream(
 
     if(i && eol == 0 && i->owner_module == self->sink_module_id) {
 
-        /* Set up stream */
-        char samplebuf[1024];
-        pa_sample_spec_snprint(samplebuf, 1024, &(i->sample_spec));
+        /* Fix sbc encoder format */
+        if(i->sample_spec.format == PA_SAMPLE_S16BE) {
+            printf(
+                "[info][PulseaudioSBCStream] "
+                "Stream format s16be\n"
+            );
+            self->audio_loop_sbc.endian = SBC_BE;
+        } else if(i->sample_spec.format == PA_SAMPLE_S16LE) {
+            printf(
+                "[info][PulseaudioSBCStream] "
+                "Stream format s16le\n"
+            );
+            self->audio_loop_sbc.endian = SBC_LE;
+        } else {
+            printf(
+                "[error][PulseaudioSBCStream] "
+                "Unable to determine stream format\n"
+            );
+        }
 
+        /* Set up stream */
         pa_stream* stream = pa_stream_new(
             c, self->sink_description.c_str(), &(i->sample_spec), NULL
         );
@@ -128,9 +145,10 @@ void PulseaudioSBCStream::context_state_cb(pa_context* c, void* self_v) {
         char options_buf[1024];
         snprintf(
             options_buf, 1024,
-            "sink_name=\"%s\" rate=\"%d\" "
-            "sink_properties=device.description=\"%s\"",
-            self->sink_name.c_str(), 32000, self->sink_description.c_str()
+            "rate=\"%d\" format=\"%s\" channels=\"%d\""
+            "sink_name=\"%s\" sink_properties=device.description=\"%s\"",
+            32000, pa_sample_format_to_string(PA_SAMPLE_S16NE), 2,
+            self->sink_name.c_str(), self->sink_description.c_str()
         );
         pa_operation* op = pa_context_load_module(
             c, "module-null-sink", options_buf, module_setup_cb, self_v
@@ -169,7 +187,7 @@ PulseaudioSBCStream::PulseaudioSBCStream(
     this->audio_loop_sbc.mode       = SBC_MODE_STEREO;
     this->audio_loop_sbc.allocation = SBC_AM_LOUDNESS;
     this->audio_loop_sbc.bitpool    = 50;
-    this->audio_loop_sbc.endian     = SBC_LE;
+    this->audio_loop_sbc.endian     = SBC_BE; // To be fixed later ?
 
     pa_threaded_mainloop* mainloop = pa_threaded_mainloop_new();
     this->mainloop = mainloop;
