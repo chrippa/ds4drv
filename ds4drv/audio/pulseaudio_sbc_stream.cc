@@ -5,7 +5,6 @@
 #include <cstring>
 
 #include <unistd.h>
-//#include <signal.h>
 
 
 #include <pulse/pulseaudio.h>
@@ -78,17 +77,12 @@ void PulseaudioSBCStream::setup_pulse_stream(
 
     if(i && eol == 0 && i->owner_module == self->sink_module_id) {
 
-        pa_proplist* sink_proplist = i->proplist;
-        int err = pa_proplist_sets(
-            sink_proplist, PA_PROP_DEVICE_DESCRIPTION, "TEST AUDIO SINK"
-        );
-
         /* Set up stream */
         char samplebuf[1024];
         pa_sample_spec_snprint(samplebuf, 1024, &(i->sample_spec));
 
         pa_stream* stream = pa_stream_new(
-            c, "" /*"STR_DS4TEST"*/, &(i->sample_spec), NULL
+            c, self->sink_description.c_str(), &(i->sample_spec), NULL
         );
 
         pa_stream_set_read_callback(stream, read_pulse_stream, self_v);
@@ -106,7 +100,7 @@ void PulseaudioSBCStream::setup_pulse_stream(
 
         char device_strbuf[1024];
         snprintf(device_strbuf, 1024, "%s.monitor", i->name);
-        int screrr = pa_stream_connect_record(
+        pa_stream_connect_record(
             stream, device_strbuf, &buffer_attr, flags
         );
     }
@@ -119,16 +113,13 @@ void PulseaudioSBCStream::module_setup_cb(
 
     self->sink_module_id = idx;
 
-    pa_context_get_sink_info_list(
+    pa_operation* op = pa_context_get_sink_info_list(
         c, setup_pulse_stream, self_v
     );
+    pa_operation_unref(op);
 }
 
 void PulseaudioSBCStream::context_state_cb(pa_context* c, void* self_v) {
-    if(pa_context_get_state(c) == PA_CONTEXT_CONNECTING) {
-        signal(SIGINT, SIG_IGN);
-    }
-
     if(pa_context_get_state(c) == PA_CONTEXT_READY) {
         printf("[info][PulseaudioSBCStream] Connecting to Pulseaudio\n");
 
@@ -141,9 +132,10 @@ void PulseaudioSBCStream::context_state_cb(pa_context* c, void* self_v) {
             "sink_properties=device.description=\"%s\"",
             self->sink_name.c_str(), 32000, self->sink_description.c_str()
         );
-        pa_context_load_module(
+        pa_operation* op = pa_context_load_module(
             c, "module-null-sink", options_buf, module_setup_cb, self_v
         );
+        pa_operation_unref(op);
         
     }
 }
@@ -153,9 +145,8 @@ void PulseaudioSBCStream::unload_module_success(
 ) {
     Self* self = static_cast<Self*>(self_v);
 
-    pa_threaded_mainloop_get_api(self->mainloop)->quit(
-        pa_threaded_mainloop_get_api(self->mainloop), 20
-    );
+    pa_mainloop_api* api = pa_threaded_mainloop_get_api(self->mainloop);
+    api->quit(api, 20);
 
     printf("[info][PulseaudioSBCStream] Disconnect successful\n");
 }
@@ -193,12 +184,17 @@ PulseaudioSBCStream::PulseaudioSBCStream(
     );
 
     pa_context* c = pa_context_new_with_proplist(
-        pa_threaded_mainloop_get_api(mainloop), "DS4TEST", proplist
+        pa_threaded_mainloop_get_api(mainloop),
+        this->sink_name.c_str(), proplist
     );
 
     this->context = c;
 
     int err = pa_context_connect(c, NULL, PA_CONTEXT_NOFLAGS, NULL);
+    if(err < 0) {
+        printf("[error][PulseaudioSBCStream] Error connecting context\n");
+    }
+
     pa_context_set_state_callback(c, context_state_cb, this);
 }
 
@@ -210,15 +206,19 @@ PulseaudioSBCStream::~PulseaudioSBCStream() {
 
 void PulseaudioSBCStream::run() {
     int err = pa_threaded_mainloop_start(this->mainloop);
+    if(err < 0) {
+        printf("[error][PulseaudioSBCStream] Error starting mainloop\n");
+    }
 }
 
 void PulseaudioSBCStream::stop() {
     printf("[info][PulseaudioSBCStream] Disconnecting from Pulseaudio\n");
     if(this->sink_module_id > 0) {
-        pa_context_unload_module(
+        pa_operation* op = pa_context_unload_module(
             this->context, this->sink_module_id,
             unload_module_success, this
         );
+        pa_operation_unref(op);
     } else {
         unload_module_success(this->context, 0, this);
     }
