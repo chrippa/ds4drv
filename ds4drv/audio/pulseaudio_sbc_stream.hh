@@ -16,10 +16,6 @@
 #include <sbc/sbc.h>
 
 class PulseaudioSBCStream {
-private:
-    std::mutex sbc_frame_buffer_mutex;
-    std::atomic<bool> sbc_frames_waiting_flag;
-
 public:
     typedef PulseaudioSBCStream Self; 
 
@@ -46,34 +42,19 @@ public:
     void remove_fd(int fd);
 
 
-    static void stream_read_cb(
+    static void read_pulse_stream(
         pa_stream *s, std::size_t length, void *self_v
     );
 
-    static void stream_state_cb(pa_stream *s, void *self_v);
-
-
-    static void stream_success_cb(
-        pa_stream *s, int success, void* self_v
-    );
-
-    static void stream_overflow_cb(pa_stream* p, void* self_v);
-
-    static void stream_underflow_cb(pa_stream* p, void* self_v);
-
-    static void sink_info_cb(
+    static void setup_pulse_stream(
         pa_context* c, const pa_sink_info* i, int eol, void* self_v
     );
 
-    static void module_cb(pa_context* c, uint32_t idx, void* self_v);
+    static void module_setup_cb(pa_context* c, uint32_t idx, void* self_v);
 
-    static void state_cb(pa_context* c, void* self_v);
+    static void context_state_cb(pa_context* c, void* self_v);
 
     static void unload_module_success(pa_context* c, int success, void* self_v);
-
-    static void mainloop_sigint_handler(
-        pa_mainloop_api* api, pa_signal_event* e, int sig, void* self_v
-    );
 
     PulseaudioSBCStream(
         std::string sink_name,

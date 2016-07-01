@@ -9,8 +9,6 @@ class AudioAction(Action):
     """Plays audio through the device"""
 
     def setup(self, device):
-        print("AudioAction Running setup")
-
         self.sbc_stream = self.controller.sbc_stream
         self.loop = self.controller.loop
 
@@ -44,5 +42,3 @@ class AudioAction(Action):
 
         # Call play_audio
         self.controller.device.play_audio(sbc_header, sbc_frame)
-
-        return True

@@ -4,7 +4,7 @@ import os
 import struct
 import signal
 
-import threading
+import signal
 from multiprocessing import Pool
 
 from io import FileIO
@@ -32,11 +32,16 @@ class HidrawWriter:
 
         self.write_pool = Pool(
             processes = 1,
-            initializer = HidrawWriter.pool_open_fds, initargs = (hidraw_device,)
+            initializer = HidrawWriter.pool_init, initargs = (hidraw_device,)
         )
 
     @staticmethod
-    def pool_open_fds(hidraw_device):
+    def pool_init(hidraw_device):
+        # Signals have been inherited from the parent. In particular,
+        # the cleanup signals from __main__. Signals are completely ignored
+        # here since Pool hangs otherwise.
+        signal.signal(signal.SIGINT, signal.SIG_IGN)
+
         HidrawWriter.report_fd = os.open(hidraw_device, os.O_RDWR | os.O_NONBLOCK)
         HidrawWriter.fd = FileIO(HidrawWriter.report_fd, "rb+", closefd=False)
 
@@ -53,36 +58,30 @@ class HidrawWriter:
         timedout = False
         oserror = False
 
-        if timeout != None:
-            old_sigalrm_handler = signal.getsignal(signal.SIGALRM)
-            signal.signal(signal.SIGALRM, HidrawWriter.sigalrm_handler)
-            signal.setitimer(signal.ITIMER_REAL, timeout)
-
         try:
+            if timeout != None:
+                old_sigalrm_handler = signal.getsignal(signal.SIGALRM)
+                signal.signal(signal.SIGALRM, HidrawWriter.sigalrm_handler)
+                signal.setitimer(signal.ITIMER_REAL, timeout)
+
             HidrawWriter.fd.write(data)
         except TimeoutError:
-            timedout = True
             pass
         except OSError:
-            oserror = True
             pass
 
-        if timeout != None:
-            signal.setitimer(signal.ITIMER_REAL, 0)
-            signal.signal(signal.SIGALRM, old_sigalrm_handler)
-
-        return timedout, oserror
+        finally:
+            if timeout != None:
+                signal.setitimer(signal.ITIMER_REAL, 0)
+                signal.signal(signal.SIGALRM, old_sigalrm_handler)
 
     def write(self, data, timeout = None):
-        if timeout == None:
-            print("No timeout")
-
-        t, o = self.write_pool.apply(HidrawWriter.pool_write, (data, timeout))
+        return self.write_pool.apply(HidrawWriter.pool_write, (data, timeout))
 
     def close(self):
-        #self.write_pool.apply(HidrawWriter.pool_close_fds);
-        #self.write_pool.close()
-        self.write_pool.terminate()
+        self.write_pool.apply(HidrawWriter.pool_close_fds)
+        self.write_pool.close()
+        self.write_pool.join()
 
 
 class HidrawDS4Device(DS4Device):
@@ -98,8 +97,6 @@ class HidrawDS4Device(DS4Device):
             raise DeviceError(err)
 
         self.buf = bytearray(self.report_size)
-
-        self.threading_local = threading.local()
 
         super(HidrawDS4Device, self).__init__(name, addr, type)
 
@@ -134,14 +131,8 @@ class HidrawDS4Device(DS4Device):
 
 
     def write_report(self, report_id, data, timeout = None):
-        #if self.type == "bluetooth":
-        #    # TODO: Add a check for a kernel that supports writing
-        #    # output reports when such a kernel has been released.
-        #    return
-
         try:
             hid = bytearray((report_id,))
-            #self.fd.write(hid + data)
             self.hidraw_writer.write(hid + data, timeout)
         except TimeoutError:
             pass
@@ -200,7 +191,6 @@ class HidrawBluetoothDS4Device(HidrawDS4Device):
             self._control()
 
         maxtime = 0.1*self.audio_buffer_size/headers.calculate_bit_rate()
-        #print("maxtime: ", maxtime)
         self.write_report(report_id, report, timeout = maxtime)
 
 
