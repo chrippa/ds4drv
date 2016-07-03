@@ -109,7 +109,9 @@ class DS4Controller(object):
     def run(self):
         self.loop.run()
 
-    def exit(self, *args, error = True):
+    def exit(self, *args, **kwargs):
+        error = kwargs.pop('error', True)
+
         if self.device:
             self.cleanup_device()
 
