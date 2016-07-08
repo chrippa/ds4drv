@@ -26,8 +26,10 @@ void PulseaudioSBCStream::read_pulse_stream(
     sbc_t* sbc = &(self->audio_loop_sbc);
 
     std::size_t sbc_frame_length = sbc_get_frame_length(sbc);
-    std::size_t sbc_buflen = 10*sbc_frame_length+10;
-    std::uint8_t sbc_buf[sbc_buflen];
+    std::size_t sbc_frame_buflen = 10*sbc_frame_length+10;
+    std::uint8_t sbc_frame_buf[sbc_frame_buflen];
+
+    std::size_t sbc_audio_length = sbc_get_codesize(sbc);
 
     while(pa_stream_readable_size(s) > 0) {
         const char* data8 = NULL;
@@ -39,31 +41,29 @@ void PulseaudioSBCStream::read_pulse_stream(
             self->audio_buffer.end(), data8, data8+length
         );
 
-        for(std::size_t i=0; i<sbc_buflen; i++) {
-            sbc_buf[i] = 0;
-        }
+        if(self->audio_buffer.size() >= sbc_audio_length) {
+            ssize_t written = 0;
 
-        ssize_t written = 0;
-        std::size_t read = sbc_encode(
-            sbc,
-            &(self->audio_buffer[0]), self->audio_buffer.size(),
-            sbc_buf, sbc_buflen,
-            &written
-        );
-
-        if(written > 0) {
-            // Write frames to supplied file descriptors
-            for(
-                FDList::iterator fd_it = self->fds.begin();
-                fd_it != self->fds.end();
-                fd_it++
-            ) {
-                write(*fd_it, sbc_buf, written);
-            }
-
-            self->audio_buffer.erase(
-                self->audio_buffer.begin(), self->audio_buffer.begin() + read
+            std::size_t read = sbc_encode(
+                sbc,
+                self->audio_buffer.linearize(), self->audio_buffer.size(),
+                sbc_frame_buf, sbc_frame_buflen,
+                &written
             );
+
+            if(written > 0) {
+
+                // Write frames to supplied file descriptors
+                for(
+                    FDList::iterator fd_it = self->fds.begin();
+                    fd_it != self->fds.end();
+                    fd_it++
+                ) {
+                    write(*fd_it, sbc_frame_buf, written);
+                }
+
+                self->audio_buffer.erase_begin(read);
+            }
         }
 
         pa_stream_drop(s);
@@ -111,9 +111,11 @@ void PulseaudioSBCStream::setup_pulse_stream(
         buffer_attr.fragsize = (uint32_t) -1;
         buffer_attr.tlength = (uint32_t) -1;
         buffer_attr.minreq = (uint32_t) -1;
-        buffer_attr.fragsize = pa_usec_to_bytes(50, &(i->sample_spec));
+        buffer_attr.fragsize = pa_usec_to_bytes(4000, &(i->sample_spec));
 
-        pa_stream_flags_t flags = PA_STREAM_ADJUST_LATENCY;
+        pa_stream_flags_t flags = static_cast<pa_stream_flags_t>(
+            PA_STREAM_ADJUST_LATENCY
+        );
 
         char device_strbuf[1024];
         snprintf(device_strbuf, 1024, "%s.monitor", i->name);
@@ -133,27 +135,55 @@ void PulseaudioSBCStream::module_setup_cb(
     pa_operation* op = pa_context_get_sink_info_list(
         c, setup_pulse_stream, self_v
     );
-    pa_operation_unref(op);
+    if(op != NULL) pa_operation_unref(op);
 }
 
 void PulseaudioSBCStream::context_state_cb(pa_context* c, void* self_v) {
+    Self* self = static_cast<Self*>(self_v);
+
+    // Context connected. Setup stream.
     if(pa_context_get_state(c) == PA_CONTEXT_READY) {
         printf("[info][PulseaudioSBCStream] Connecting to Pulseaudio\n");
 
         Self* self = static_cast<Self*>(self_v);
 
+        // Build new sink_description string with spaces escaped.
+        std::string sanitized_description = self->sink_description;
+        std::size_t last_pos = 0;
+        std::size_t found = 0;
+        while(
+            (found = sanitized_description.find(' ', last_pos))
+                != sanitized_description.npos
+        ) {
+            sanitized_description.replace(found, 1, "\\ ");
+            last_pos = found + 2;
+        }
         char options_buf[1024];
         snprintf(
             options_buf, 1024,
             "rate=\"%d\" format=\"%s\" channels=\"%d\""
             "sink_name=\"%s\" sink_properties=device.description=\"%s\"",
             32000, pa_sample_format_to_string(PA_SAMPLE_S16NE), 2,
-            self->sink_name.c_str(), self->sink_description.c_str()
+            self->sink_name.c_str(), sanitized_description.c_str()
         );
         pa_operation* op = pa_context_load_module(
             c, "module-null-sink", options_buf, module_setup_cb, self_v
         );
-        pa_operation_unref(op);
+        if(op != NULL) pa_operation_unref(op);
+    }
+
+    // Context failed. Assume pulse will restart and try reconnecting.
+    if(pa_context_get_state(c) == PA_CONTEXT_FAILED) {
+        printf(
+            "[info][PulseaudioSBCStream] Context failed. Reconnecting...\n"
+        );
+
+        unsigned int sleep_time = 1;
+
+        // Try reconnecting every sleep_time seconds.
+        while(self->setup_context() < 0) {
+            sleep(sleep_time);
+        }
     }
 }
 
@@ -177,7 +207,7 @@ PulseaudioSBCStream::PulseaudioSBCStream(
     sink_description(sink_description),
     sink_module_id(-1),
 
-    audio_buffer()
+    audio_buffer(512*100)
 {
     sbc_init(&(this->audio_loop_sbc), 0);
 
@@ -192,6 +222,18 @@ PulseaudioSBCStream::PulseaudioSBCStream(
     pa_threaded_mainloop* mainloop = pa_threaded_mainloop_new();
     this->mainloop = mainloop;
 
+    this->setup_context();
+}
+
+PulseaudioSBCStream::~PulseaudioSBCStream() {
+    this->stop();
+
+    pa_context_disconnect(this->context);
+
+    sbc_finish(&(this->audio_loop_sbc));
+}
+
+int PulseaudioSBCStream::setup_context() {
     pa_proplist* proplist = pa_proplist_new();
     pa_proplist_sets(
         proplist, PA_PROP_DEVICE_STRING, this->sink_name.c_str()
@@ -208,17 +250,14 @@ PulseaudioSBCStream::PulseaudioSBCStream(
     this->context = c;
 
     int err = pa_context_connect(c, NULL, PA_CONTEXT_NOFLAGS, NULL);
-    if(err < 0) {
+    if(err >= 0) {
+        pa_context_set_state_callback(c, context_state_cb, this);
+    }
+    else {
         printf("[error][PulseaudioSBCStream] Error connecting context\n");
     }
 
-    pa_context_set_state_callback(c, context_state_cb, this);
-}
-
-PulseaudioSBCStream::~PulseaudioSBCStream() {
-    pa_context_disconnect(this->context);
-
-    sbc_finish(&(this->audio_loop_sbc));
+    return err;
 }
 
 void PulseaudioSBCStream::run() {
@@ -235,7 +274,7 @@ void PulseaudioSBCStream::stop() {
             this->context, this->sink_module_id,
             unload_module_success, this
         );
-        pa_operation_unref(op);
+        if(op != NULL) pa_operation_unref(op);
     } else {
         unload_module_success(this->context, 0, this);
     }

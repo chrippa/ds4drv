@@ -7,6 +7,8 @@
 #include <mutex>
 #include <atomic>
 
+#include <boost/circular_buffer.hpp>
+
 #include <pulse/context.h>
 #include <pulse/thread-mainloop.h>
 #include <pulse/stream.h>
@@ -33,7 +35,7 @@ public:
     uint32_t sink_module_id;
 
     sbc_t audio_loop_sbc;
-    std::vector<char> audio_buffer;
+    boost::circular_buffer<unsigned char> audio_buffer;
 
     typedef std::set<int> FDList;
     FDList fds;
@@ -62,6 +64,8 @@ public:
     );
 
     ~PulseaudioSBCStream();
+
+    int setup_context();
 
     void run();
 

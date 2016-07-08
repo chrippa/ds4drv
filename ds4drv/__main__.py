@@ -160,7 +160,7 @@ class SigintHandler(object):
 
 def main():
     sbc_stream = PulseaudioSBCStream(
-        "ds4drv", "Test\\ ds4drv\\ sink"
+        "ds4drv", "Test ds4drv sink"
     )
     sbc_stream.run()
 

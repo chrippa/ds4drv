@@ -42,12 +42,14 @@ class HidrawWriter:
         # here since Pool hangs otherwise.
         signal.signal(signal.SIGINT, signal.SIG_IGN)
 
-        HidrawWriter.report_fd = os.open(hidraw_device, os.O_RDWR | os.O_NONBLOCK)
-        HidrawWriter.fd = FileIO(HidrawWriter.report_fd, "rb+", closefd=False)
+        HidrawWriter.report_fd = os.open(
+            hidraw_device,
+            os.O_WRONLY | os.O_SYNC
+        )
 
     @staticmethod
     def pool_close_fds():
-        HidrawWriter.fd.close()
+        pass
 
     @staticmethod
     def sigalrm_handler(signum, frame):
@@ -55,18 +57,17 @@ class HidrawWriter:
 
     @staticmethod
     def pool_write(data, timeout):
-        timedout = False
-        oserror = False
-
         try:
             if timeout != None:
                 old_sigalrm_handler = signal.getsignal(signal.SIGALRM)
                 signal.signal(signal.SIGALRM, HidrawWriter.sigalrm_handler)
                 signal.setitimer(signal.ITIMER_REAL, timeout)
 
-            HidrawWriter.fd.write(data)
+            os.write(HidrawWriter.report_fd, data)
+
         except TimeoutError:
             pass
+
         except OSError:
             pass
 
@@ -88,7 +89,7 @@ class HidrawDS4Device(DS4Device):
     def __init__(self, name, addr, type, hidraw_device, event_device):
         try:
             self.hidraw_writer = HidrawWriter(hidraw_device)
-            self.report_fd = os.open(hidraw_device, os.O_RDWR | os.O_NONBLOCK)
+            self.report_fd = os.open(hidraw_device, os.O_RDONLY | os.O_NONBLOCK)
             self.fd = FileIO(self.report_fd, "rb+", closefd=False)
 
             self.input_device = InputDevice(event_device)
@@ -133,7 +134,7 @@ class HidrawDS4Device(DS4Device):
     def write_report(self, report_id, data, timeout = None):
         try:
             hid = bytearray((report_id,))
-            self.hidraw_writer.write(hid + data, timeout)
+            self.hidraw_writer.write(hid + data, timeout = timeout)
         except TimeoutError:
             pass
 
@@ -190,7 +191,7 @@ class HidrawBluetoothDS4Device(HidrawDS4Device):
             self.set_volume(60, 60, 0)
             self._control()
 
-        maxtime = 0.01*self.audio_buffer_size/headers.calculate_bit_rate()
+        maxtime = 1*self.audio_buffer_size/headers.calculate_bit_rate()
         self.write_report(report_id, report, timeout = maxtime)
 
 
