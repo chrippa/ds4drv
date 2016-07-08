@@ -104,9 +104,6 @@ suggested googling: *<distro name> bluetooth pairing*
 To use the DS4 via USB in this mode, simply connect your DS4 to your computer via
 a micro USB cable.
 
-**Note:** Unfortunately due to a kernel bug it is currently not possible to use
-any LED functionality when using bluetooth devices in this mode.
-
 
 Permissions
 ^^^^^^^^^^^
