@@ -81,12 +81,19 @@ class DS4Device(object):
         self._led_flash = (0, 0)
         self._led_flashing = False
 
+        self._volume_l = 0
+        self._volume_r = 0
+        self._volume_speaker = 0
+
         self.set_operational()
 
     def _control(self, **kwargs):
         self.control(led_red=self._led[0], led_green=self._led[1],
                      led_blue=self._led[2], flash_led1=self._led_flash[0],
-                     flash_led2=self._led_flash[1], **kwargs)
+                     flash_led2=self._led_flash[1],
+                     volume_l = self._volume_l, volume_r = self._volume_r,
+                     volume_speaker = self._volume_speaker,
+                     **kwargs)
 
     def rumble(self, small=0, big=0):
         """Sets the intensity of the rumble motors. Valid range is 0-255."""
@@ -96,6 +103,11 @@ class DS4Device(object):
         """Sets the LED color. Values are RGB between 0-255."""
         self._led = (red, green, blue)
         self._control()
+
+    def set_volume(self, volume_l = 0, volume_r = 0, volume_speaker = 0):
+        self._volume_l = volume_l
+        self._volume_r = volume_r
+        self._volume_speaker = volume_speaker
 
     def start_led_flash(self, on, off):
         """Starts flashing the LED."""
@@ -116,7 +128,10 @@ class DS4Device(object):
 
     def control(self, big_rumble=0, small_rumble=0,
                 led_red=0, led_green=0, led_blue=0,
-                flash_led1=0, flash_led2=0):
+                flash_led1=0, flash_led2=0,
+                volume_l = 60, volume_r = 60,
+                volume_speaker = 80):
+
         if self.type == "bluetooth":
             pkt = bytearray(77)
             pkt[0] = 128
@@ -144,6 +159,11 @@ class DS4Device(object):
 
         # Time to flash dark (255 = 2.5 seconds)
         pkt[offset+9] = min(flash_led2, 255)
+
+        if report_id == 0x11:
+            pkt[offset+18] = min(volume_l, 100)
+            pkt[offset+19] = min(volume_r, 100)
+            pkt[offset+21] = min(volume_speaker, 100)
 
         self.write_report(report_id, pkt)
 
@@ -216,6 +236,10 @@ class DS4Device(object):
 
     def write_report(self, report_id, data):
         """Writes a HID report to the control channel."""
+        pass
+
+    def play_audio(self, headers, data):
+        """Plays audio through the device"""
         pass
 
     def set_operational(self):

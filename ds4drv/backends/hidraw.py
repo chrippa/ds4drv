@@ -1,6 +1,11 @@
 import fcntl
 import itertools
 import os
+import struct
+import signal
+
+import signal
+from multiprocessing import Pool
 
 from io import FileIO
 from time import sleep
@@ -19,11 +24,74 @@ HIDIOCSFEATURE = lambda size: IOC_RW | (0x06 << 0) | (size << 16)
 HIDIOCGFEATURE = lambda size: IOC_RW | (0x07 << 0) | (size << 16)
 
 
+class HidrawWriter:
+    def __init__(self, hidraw_device, *args, **kwargs):
+        super(HidrawWriter, self).__init__(*args, **kwargs)
+
+        self.hidraw_device = hidraw_device
+
+        self.write_pool = Pool(
+            processes = 1,
+            initializer = HidrawWriter.pool_init, initargs = (hidraw_device,)
+        )
+
+    @staticmethod
+    def pool_init(hidraw_device):
+        # Signals have been inherited from the parent. In particular,
+        # the cleanup signals from __main__. Signals are completely ignored
+        # here since Pool hangs otherwise.
+        signal.signal(signal.SIGINT, signal.SIG_IGN)
+
+        HidrawWriter.report_fd = os.open(
+            hidraw_device,
+            os.O_WRONLY | os.O_SYNC
+        )
+
+    @staticmethod
+    def pool_close_fds():
+        pass
+
+    @staticmethod
+    def sigalrm_handler(signum, frame):
+        raise TimeoutError
+
+    @staticmethod
+    def pool_write(data, timeout):
+        try:
+            if timeout != None:
+                old_sigalrm_handler = signal.getsignal(signal.SIGALRM)
+                signal.signal(signal.SIGALRM, HidrawWriter.sigalrm_handler)
+                signal.setitimer(signal.ITIMER_REAL, timeout)
+
+            os.write(HidrawWriter.report_fd, data)
+
+        except TimeoutError:
+            pass
+
+        except OSError:
+            pass
+
+        finally:
+            if timeout != None:
+                signal.setitimer(signal.ITIMER_REAL, 0)
+                signal.signal(signal.SIGALRM, old_sigalrm_handler)
+
+    def write(self, data, timeout = None):
+        return self.write_pool.apply(HidrawWriter.pool_write, (data, timeout))
+
+    def close(self):
+        self.write_pool.apply(HidrawWriter.pool_close_fds)
+        self.write_pool.close()
+        self.write_pool.join()
+
+
 class HidrawDS4Device(DS4Device):
     def __init__(self, name, addr, type, hidraw_device, event_device):
         try:
-            self.report_fd = os.open(hidraw_device, os.O_RDWR | os.O_NONBLOCK)
+            self.hidraw_writer = HidrawWriter(hidraw_device)
+            self.report_fd = os.open(hidraw_device, os.O_RDONLY | os.O_NONBLOCK)
             self.fd = FileIO(self.report_fd, "rb+", closefd=False)
+
             self.input_device = InputDevice(event_device)
             self.input_device.grab()
         except (OSError, IOError) as err:
@@ -62,17 +130,18 @@ class HidrawDS4Device(DS4Device):
 
         return fcntl.ioctl(self.fd, op, bytes(buf))
 
-    def write_report(self, report_id, data):
-        if self.type == "bluetooth":
-            # TODO: Add a check for a kernel that supports writing
-            # output reports when such a kernel has been released.
-            return
 
-        hid = bytearray((report_id,))
-        self.fd.write(hid + data)
+    def write_report(self, report_id, data, timeout = None):
+        try:
+            hid = bytearray((report_id,))
+            self.hidraw_writer.write(hid + data, timeout = timeout)
+        except TimeoutError:
+            pass
+
 
     def close(self):
         try:
+            self.hidraw_writer.close()
             self.fd.close()
             self.input_device.ungrab()
         except IOError:
@@ -85,8 +154,45 @@ class HidrawBluetoothDS4Device(HidrawDS4Device):
     report_size = 78
     valid_report_id = 0x11
 
+    audio_buffer_size = 448
+    audio_buffer = b''
+    frame_number = 0
+
     def set_operational(self):
         self.read_feature_report(0x02, 37)
+
+    def increment_frame_number(self, inc):
+            self.frame_number += inc
+            if self.frame_number > 0xffff:
+                    self.frame_number = 0
+
+    def play_audio(self, headers, data):
+        if len(self.audio_buffer) + len(data) <= self.audio_buffer_size:
+            self.audio_buffer += data
+            return
+
+        crc = b'\x00\x00\x00\x00'
+        audio_header = b'\x24'
+
+        self.increment_frame_number(4)
+
+        report_id = 0x17
+        report = (
+            b'\x40\xA0'
+            + struct.pack("<H", self.frame_number)
+            + audio_header
+            + self.audio_buffer
+            + bytearray(452 - len(self.audio_buffer)) + crc
+        )
+
+        self.audio_buffer = data
+
+        if self._volume_r == 0:
+            self.set_volume(60, 60, 0)
+            self._control()
+
+        maxtime = 1*self.audio_buffer_size/headers.calculate_bit_rate()
+        self.write_report(report_id, report, timeout = maxtime)
 
 
 class HidrawUSBDS4Device(HidrawDS4Device):

@@ -9,10 +9,11 @@ from .config import load_options
 from .daemon import Daemon
 from .eventloop import EventLoop
 from .exceptions import BackendError
+from .audio import PulseaudioSBCStream
 
 
 class DS4Controller(object):
-    def __init__(self, index, options, dynamic=False):
+    def __init__(self, index, options, sbc_stream, dynamic=False):
         self.index = index
         self.dynamic = dynamic
         self.logger = Daemon.logger.new_module("controller {0}".format(index))
@@ -32,6 +33,8 @@ class DS4Controller(object):
 
         if self.profiles:
             self.profiles.append("default")
+
+        self.sbc_stream = sbc_stream
 
         self.load_options(self.options)
 
@@ -122,8 +125,10 @@ class DS4Controller(object):
             self.logger.info(*args)
 
 
-def create_controller_thread(index, controller_options, dynamic=False):
-    controller = DS4Controller(index, controller_options, dynamic=dynamic)
+def create_controller_thread(index, controller_options, sbc_stream,
+                             dynamic=False):
+    controller = DS4Controller(index, controller_options, sbc_stream,
+                               dynamic=dynamic)
 
     thread = Thread(target=controller.run)
     thread.controller = controller
@@ -133,26 +138,37 @@ def create_controller_thread(index, controller_options, dynamic=False):
 
 
 class SigintHandler(object):
-    def __init__(self, threads):
-        self.threads = threads
+    def __init__(self, controller_threads, sbc_stream):
+        self.controller_threads = controller_threads
+        self.sbc_stream = sbc_stream
 
-    def cleanup_controller_threads(self):
-        for thread in self.threads:
+    def cleanup_controller_controller_threads(self):
+        for thread in self.controller_threads:
             thread.controller.exit("Cleaning up...", error=False)
             thread.controller.loop.stop()
             thread.join()
 
+    def cleanup_sbc_stream(self):
+        self.sbc_stream.stop()
+
     def __call__(self, signum, frame):
         signal.signal(signum, signal.SIG_DFL)
 
-        self.cleanup_controller_threads()
+        self.cleanup_sbc_stream()
+        self.cleanup_controller_controller_threads()
+
         sys.exit(0)
 
 
 def main():
-    threads = []
+    sbc_stream = PulseaudioSBCStream(
+        "ds4drv", "Test ds4drv sink"
+    )
+    sbc_stream.run()
 
-    sigint_handler = SigintHandler(threads)
+    controller_threads = []
+
+    sigint_handler = SigintHandler(controller_threads, sbc_stream)
     signal.signal(signal.SIGINT, sigint_handler)
 
     try:
@@ -174,12 +190,14 @@ def main():
         Daemon.fork(options.daemon_log, options.daemon_pid)
 
     for index, controller_options in enumerate(options.controllers):
-        thread = create_controller_thread(index + 1, controller_options)
-        threads.append(thread)
+        thread = create_controller_thread(
+            index + 1, controller_options, sbc_stream
+        )
+        controller_threads.append(thread)
 
     for device in backend.devices:
         connected_devices = []
-        for thread in threads:
+        for thread in controller_threads:
             # Controller has received a fatal error, exit
             if thread.controller.error:
                 sys.exit(1)
@@ -187,22 +205,23 @@ def main():
             if thread.controller.device:
                 connected_devices.append(thread.controller.device.device_addr)
 
-            # Clean up dynamic threads
+            # Clean up dynamic controller_threads
             if not thread.is_alive():
-                threads.remove(thread)
+                controller_threads.remove(thread)
 
         if device.device_addr in connected_devices:
             backend.logger.warning("Ignoring already connected device: {0}",
                                    device.device_addr)
             continue
 
-        for thread in filter(lambda t: not t.controller.device, threads):
+        for thread in filter(lambda t: not t.controller.device, controller_threads):
             break
         else:
-            thread = create_controller_thread(len(threads) + 1,
+            thread = create_controller_thread(len(controller_threads) + 1,
                                               options.default_controller,
+                                              sbc_stream,
                                               dynamic=True)
-            threads.append(thread)
+            controller_threads.append(thread)
 
         thread.controller.setup_device(device)
 
