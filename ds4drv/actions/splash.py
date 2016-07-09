@@ -1,5 +1,6 @@
 from ..action import Action
 
+from collections import namedtuple
 from time import sleep
 
 
@@ -16,57 +17,67 @@ class ActionSplash(Action):
         self.led = (0, 0, 1)
         self.no_splash = False
 
+    @staticmethod
+    def interpolate_leds(l1, l2, n):
+        diff = (
+            (l2[0] - l1[0])/n,
+            (l2[1] - l1[1])/n,
+            (l2[2] - l1[2])/n
+        )
+
+        for i in range(n):
+            yield (
+                l1[0] + diff[0]*i,
+                l1[1] + diff[1]*i,
+                l1[2] + diff[2]*i
+            )
+
     def setup(self, device):
         if self.no_splash == True:
             return
 
-        def interpolate_leds(l1, l2, n):
-            diff = (
-                (l2[0] - l1[0])/n,
-                (l2[1] - l1[1])/n,
-                (l2[2] - l1[2])/n
+        splash_time = 0.5
+
+        # Define key frames
+        high_rumble = (255, 63) # (small_rumble, big_rumble)
+        low_rumble  = (0, 0)
+
+        Frame = namedtuple('Frame', ['led', 'rumble'])
+
+        splash_key_frames = [
+            Frame(led = self.led,      rumble = high_rumble),
+            Frame(led = (255, 255, 0), rumble = low_rumble),
+            Frame(led = (0, 255, 255), rumble = high_rumble),
+            Frame(led = (0, 0, 0),     rumble = low_rumble),
+            Frame(led = self.led,      rumble = low_rumble)
+        ]
+        splash_frame_counts = [4, 6, 8, 4]
+
+
+        # Build all frames
+        splash_frames = []
+        for i, nframes in enumerate(splash_frame_counts):
+            frame_leds = self.interpolate_leds(
+                splash_key_frames[i].led, splash_key_frames[i+1].led,
+                nframes
             )
-            for i in range(n):
-                yield (
-                    l1[0] + diff[0]*i,
-                    l1[1] + diff[1]*i,
-                    l1[2] + diff[2]*i
-                )
+            frame_rumbles = [splash_key_frames[i].rumble] * nframes
 
-        splash_time = 1
-        splash_frame_counts = [10, 10, 10, 10]
-        splash_frame_time = splash_time/sum(splash_frame_counts)
+            for led, rumble in zip(frame_leds, frame_rumbles):
+                splash_frames.append(Frame(led = led, rumble = rumble))
 
-        big_rumble = 255
-        small_rumble = 255
 
-        self.controller.device.rumble(small_rumble, big_rumble)
-        for led in interpolate_leds(
-            self.led, (255, 255, 0), splash_frame_counts[0]
-        ):
-            self.controller.device.set_led(*tuple(map(int, led)))
-            sleep(splash_frame_time)
+        # Play frames
+        splash_frame_duration = splash_time/len(splash_frames)
 
-        self.controller.device.rumble(0, 0)
-        for led in interpolate_leds(
-            (255, 255, 0), (0, 255, 255), splash_frame_counts[1]
-        ):
-            self.controller.device.set_led(*tuple(map(int, led)))
-            sleep(splash_frame_time)
+        for splash_frame in splash_frames:
+            frame_led    = tuple(map(int, splash_frame.led))
+            frame_rumble = tuple(map(int, splash_frame.rumble))
 
-        self.controller.device.rumble(small_rumble, big_rumble)
-        for led in interpolate_leds(
-            (0, 255, 255), (0, 0, 0), splash_frame_counts[2]
-        ):
-            self.controller.device.set_led(*tuple(map(int, led)))
-            sleep(splash_frame_time)
+            self.controller.device.set_led(*frame_led)
+            self.controller.device.rumble(*frame_rumble)
 
-        self.controller.device.rumble(0, 0)
-        for led in interpolate_leds(
-            (0, 0, 0), self.led, splash_frame_counts[2]
-        ):
-            self.controller.device.set_led(*tuple(map(int, led)))
-            sleep(splash_frame_time)
+            sleep(splash_frame_duration)
 
         self.controller.device.set_led(*(self.led))
 
