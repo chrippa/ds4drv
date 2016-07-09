@@ -10,11 +10,14 @@ Action.add_option("--no-splash", action="store_true",
 class ActionSplash(Action):
     """Rumble controller and flash LEDs on connection."""
 
-    def load_options(self, options):
-        if not self.controller.device:
-            return
+    def __init__(self, *args, **kwargs):
+        super(ActionSplash, self).__init__(*args, **kwargs)
 
-        if options.no_splash == True:
+        self.led = (0, 0, 1)
+        self.no_splash = False
+
+    def setup(self, device):
+        if self.no_splash == True:
             return
 
         def interpolate_leds(l1, l2, n):
@@ -39,7 +42,7 @@ class ActionSplash(Action):
 
         self.controller.device.rumble(small_rumble, big_rumble)
         for led in interpolate_leds(
-            (0, 0, 0), (255, 255, 0), splash_frame_counts[0]
+            self.led, (255, 255, 0), splash_frame_counts[0]
         ):
             self.controller.device.set_led(*tuple(map(int, led)))
             sleep(splash_frame_time)
@@ -60,9 +63,13 @@ class ActionSplash(Action):
 
         self.controller.device.rumble(0, 0)
         for led in interpolate_leds(
-            (0, 0, 0), options.led, splash_frame_counts[2]
+            (0, 0, 0), self.led, splash_frame_counts[2]
         ):
             self.controller.device.set_led(*tuple(map(int, led)))
             sleep(splash_frame_time)
 
-        self.controller.device.set_led(*(options.led))
+        self.controller.device.set_led(*(self.led))
+
+    def load_options(self, options):
+        self.led = options.led
+        self.no_splash = options.no_splash
