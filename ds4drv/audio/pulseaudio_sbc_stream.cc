@@ -77,7 +77,9 @@ void PulseaudioSBCStream::setup_pulse_stream(
 
     if(i && eol == 0 && i->owner_module == self->sink_module_id) {
 
-        /* Fix sbc encoder format */
+        // Fix sbc encoder format
+
+        // Endianness
         if(i->sample_spec.format == PA_SAMPLE_S16BE) {
             printf(
                 "[info][PulseaudioSBCStream] "
@@ -97,7 +99,39 @@ void PulseaudioSBCStream::setup_pulse_stream(
             );
         }
 
-        /* Set up stream */
+        // Sample rate
+        if(i->sample_spec.rate == 16000) {
+            printf(
+                "[info][PulseaudioSBCStream] "
+                "Stream sample rate 16000\n"
+            );
+            self->audio_loop_sbc.frequency = SBC_FREQ_16000;
+        } else if(i->sample_spec.rate == 32000) {
+            printf(
+                "[info][PulseaudioSBCStream] "
+                "Stream sample rate 32000\n"
+            );
+            self->audio_loop_sbc.frequency = SBC_FREQ_32000;
+        }
+
+        // Some info
+        std::size_t sbc_codesize = sbc_get_codesize(
+            &(self->audio_loop_sbc)
+        );
+        std::size_t sbc_frame_length = sbc_get_frame_length(
+            &(self->audio_loop_sbc)
+        );
+        printf(
+            "[info][PulseaudioSBCStream] "
+            "Stream codesize: %zu\n", sbc_codesize
+        );
+        printf(
+            "[info][PulseaudioSBCStream] "
+            "Stream frame_length: %zu\n", sbc_frame_length
+        );
+
+
+        // Set up stream
         pa_stream* stream = pa_stream_new(
             c, self->sink_description.c_str(), &(i->sample_spec), NULL
         );
@@ -163,7 +197,7 @@ void PulseaudioSBCStream::context_state_cb(pa_context* c, void* self_v) {
             options_buf, 1024,
             "rate=\"%d\" format=\"%s\" channels=\"%d\""
             "sink_name=\"%s\" sink_properties=device.description=\"%s\"",
-            32000, pa_sample_format_to_string(PA_SAMPLE_S16NE), 2,
+            self->sample_rate, pa_sample_format_to_string(PA_SAMPLE_S16NE), 2,
             self->sink_name.c_str(), sanitized_description.c_str()
         );
         pa_operation* op = pa_context_load_module(
@@ -207,17 +241,19 @@ PulseaudioSBCStream::PulseaudioSBCStream(
     sink_description(sink_description),
     sink_module_id(-1),
 
+    sample_rate(32000),
+
     audio_buffer(512*100)
 {
     sbc_init(&(this->audio_loop_sbc), 0);
 
-    this->audio_loop_sbc.frequency  = SBC_FREQ_32000;
+    this->audio_loop_sbc.frequency  = SBC_FREQ_32000; // Possibly reset later.
     this->audio_loop_sbc.blocks     = SBC_BLK_16;
     this->audio_loop_sbc.subbands   = SBC_SB_8;
-    this->audio_loop_sbc.mode       = SBC_MODE_STEREO;
+    this->audio_loop_sbc.mode       = SBC_MODE_DUAL_CHANNEL;
     this->audio_loop_sbc.allocation = SBC_AM_LOUDNESS;
-    this->audio_loop_sbc.bitpool    = 50;
-    this->audio_loop_sbc.endian     = SBC_BE; // To be fixed later ?
+    this->audio_loop_sbc.bitpool    = 25;
+    this->audio_loop_sbc.endian     = SBC_BE; // Possibly reset later.
 
     pa_threaded_mainloop* mainloop = pa_threaded_mainloop_new();
     this->mainloop = mainloop;

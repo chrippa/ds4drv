@@ -1,7 +1,6 @@
 #include <string>
 #include <vector>
 #include <set>
-#include <functional>
 #include <memory>
 
 #include <mutex>
@@ -21,18 +20,14 @@ class PulseaudioSBCStream {
 public:
     typedef PulseaudioSBCStream Self;
 
-    typedef std::function<
-        void (
-            sbc_t* sbc, void* sbc_frame, size_t length
-        )
-    > ReadSBCFrameCallback;
-
     pa_context* context;
     pa_threaded_mainloop* mainloop;
 
     std::string sink_name;
     std::string sink_description;
     uint32_t sink_module_id;
+
+    uint32_t sample_rate;
 
     sbc_t audio_loop_sbc;
     boost::circular_buffer<unsigned char> audio_buffer;
