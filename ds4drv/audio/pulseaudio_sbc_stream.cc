@@ -3,6 +3,7 @@
 #include <cstdio>
 #include <cstdlib>
 #include <cstring>
+#include <stdint.h>
 
 #include <unistd.h>
 
@@ -27,7 +28,7 @@ void PulseaudioSBCStream::read_pulse_stream(
 
     std::size_t sbc_frame_length = sbc_get_frame_length(sbc);
     std::size_t sbc_frame_buflen = 10*sbc_frame_length+10;
-    std::uint8_t sbc_frame_buf[sbc_frame_buflen];
+    uint8_t sbc_frame_buf[sbc_frame_buflen];
 
     std::size_t sbc_audio_length = sbc_get_codesize(sbc);
 

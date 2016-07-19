@@ -84,7 +84,8 @@ setup(name="ds4drv",
           extra_compile_args=[
             subprocess.check_output(
                 "pkg-config --cflags libpulse", shell=True
-            ).decode('utf-8')
+            ).decode('utf-8'),
+            '-std=c++98'
           ],
           libraries=["pulse", "sbc"]
         )

@@ -3,9 +3,6 @@
 #include <set>
 #include <memory>
 
-#include <mutex>
-#include <atomic>
-
 #include <boost/circular_buffer.hpp>
 
 #include <pulse/context.h>
