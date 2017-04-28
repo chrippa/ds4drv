@@ -451,13 +451,17 @@ def create_uinput_device(mapping):
 
 def parse_uinput_mapping(name, mapping):
     """Parses a dict of mapping options."""
-    axes, buttons, mouse, mouse_options = {}, {}, {}, {}
+    axes, hats, buttons, mouse, mouse_options = {}, {}, {}, {}, {}
     description = "ds4drv custom mapping ({0})".format(name)
 
     for key, attr in mapping.items():
         key = key.upper()
+        if ',' in attr: # Split multiple values into a tuple
+            attr = tuple(attr.split(','))
         if key.startswith("BTN_") or key.startswith("KEY_"):
             buttons[key] = attr
+        elif key.startswith("ABS_HAT"):
+            hats[key] = attr
         elif key.startswith("ABS_"):
             axes[key] = attr
         elif key.startswith("REL_"):
@@ -465,7 +469,7 @@ def parse_uinput_mapping(name, mapping):
         elif key.startswith("MOUSE_"):
             mouse_options[key] = attr
 
-    create_mapping(name, description, axes=axes, buttons=buttons,
+    create_mapping(name, description, axes=axes, hats=hats, buttons=buttons,
                    mouse=mouse, mouse_options=mouse_options)
 
 
