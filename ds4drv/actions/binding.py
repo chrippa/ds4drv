@@ -8,6 +8,7 @@ from itertools import chain
 
 from ..action import ReportAction
 from ..config import buttoncombo
+from ..config import axescombo
 
 ReportAction.add_option("--bindings", metavar="bindings",
                         help="Use custom action bindings specified in the "
