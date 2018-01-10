@@ -7,3 +7,4 @@ from . import dump
 from . import input
 from . import led
 from . import status
+from . import splash
