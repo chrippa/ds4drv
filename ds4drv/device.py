@@ -10,7 +10,7 @@ class StructHack(Struct):
         return Struct.unpack_from(self, buf, offset)
 
 
-if sys_version[0] == 2 and sys_version[1] <= 7 and sys_version[2] <= 4:
+if sys_version[:3] <= (2, 7, 4):
     S16LE = StructHack("<h")
 else:
     S16LE = Struct("<h")
