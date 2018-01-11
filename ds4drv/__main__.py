@@ -1,3 +1,9 @@
+try:
+    import demandimport
+    demandimport.enable()
+except ImportError:
+    pass
+
 import sys
 import signal
 
