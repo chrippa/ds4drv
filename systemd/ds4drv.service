@@ -4,7 +4,7 @@ Requires=bluetooth.service
 After=bluetooth.service
 
 [Service]
-ExecStart=/usr/bin/ds4drv
+ExecStart=`which ds4drv`
 Restart=on-abort
 
 [Install]
