@@ -12,6 +12,8 @@ ReportAction.add_option("--emulate-xpad", action="store_true",
 ReportAction.add_option("--emulate-xpad-wireless", action="store_true",
                         help="Emulates the same joystick layout as a wireless "
                              "Xbox 360 controller used via the xpad module")
+ReportAction.add_option("--emulate-kernel", action="store_true",
+                        help="Emulates the same joystick layout as the default kernel driver.")
 ReportAction.add_option("--ignored-buttons", metavar="button(s)",
                         type=buttoncombo(","), default=[],
                         help="A comma-separated list of buttons to never send "
@@ -62,8 +64,10 @@ class ReportActionInput(ReportAction):
                 joystick_layout = "xpad"
             elif options.emulate_xpad_wireless:
                 joystick_layout = "xpad_wireless"
-            else:
+            elif options.emulate_kernel:
                 joystick_layout = "ds4"
+            else:
+                joystick_layout = "ds4drv"
 
             if not self.mouse and options.trackpad_mouse:
                 self.mouse = create_uinput_device("mouse")
