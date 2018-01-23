@@ -18,7 +18,7 @@ Features
 - Custom mappings, map buttons and sticks to whatever mouse, key or joystick
   action you want
 - Settings profiles that can be cycled through with a button binding
-
+- Disable Buttons and Axes
 
 Installing
 ----------

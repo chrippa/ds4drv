@@ -237,6 +237,7 @@ class UInputDevice(object):
         self.joystick_dev = None
         self.evdev_dev = None
         self.ignored_buttons = set()
+        self.ignored_axes = set()
         self.create_device(layout)
 
         self._write_cache = {}
@@ -312,7 +313,14 @@ class UInputDevice(object):
         """Writes axes, buttons and hats with values from the report to
         the device."""
         for name, attr in self.layout.axes.items():
-            value = getattr(report, attr)
+
+            if attr in self.ignored_axes:
+                value = False
+            else:
+                value = getattr(report, attr)
+                if value > 120 and value < 140:
+                    value = 130
+
             self.write_event(ecodes.EV_ABS, name, value)
 
         for name, attr in self.layout.buttons.items():
