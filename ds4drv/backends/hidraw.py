@@ -4,6 +4,7 @@ import os
 
 from io import FileIO
 from time import sleep
+import zlib
 
 from evdev import InputDevice
 from pyudev import Context, Monitor
@@ -62,9 +63,30 @@ class HidrawDS4Device(DS4Device):
 
         return fcntl.ioctl(self.fd, op, bytes(buf))
 
-    def write_report(self, report_id, data):
-        hid = bytearray((report_id,))
-        self.fd.write(hid + data)
+    def write_report(self, report_id, report):
+        """
+        Send a feature report.
+        """
+        tmp = [0]*79
+        tmp[:7]= [0xa2, 0x11, 0xC0, 0x00, 0xff, 0x00, 0x00]
+        tmp[7]  = report[5]   #rumble weak
+        tmp[8]  = report[6]   #rumble strong
+        tmp[9]  = report[7]   #red
+        tmp[10] = report[8]   #green
+        tmp[11] = report[9]   #blue
+        tmp[12] = report[10]  # Time to flash bright (255 = 2.5 seconds)
+        tmp[13] = report[11]  # Time to flash dim (255 = 2.5 seconds)
+        
+        buf = bytearray(tmp)
+        
+        crc = zlib.crc32(bytes(buf[:(len(buf)-4)])) & 0xffffffff
+
+        buf[len(buf)-4] = chr(crc & 0xFF)
+        buf[len(buf)-3] = chr((crc & 0xFF00) >> 8)
+        buf[len(buf)-2] = chr((crc & 0xFF0000)>>16)
+        buf[len(buf)-1] = chr((crc & 0xFF000000)>>24)
+        
+        self.fd.write(buf[1:])
 
     def close(self):
         try:
