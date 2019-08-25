@@ -72,12 +72,12 @@ create_mapping(
         "ABS_RZ":       "right_analog_y",
         "ABS_RX":       "l2_analog",
         "ABS_RY":       "r2_analog",
-        "ABS_THROTTLE": "orientation_roll",
-        "ABS_RUDDER":   "orientation_pitch",
-        "ABS_WHEEL":    "orientation_yaw",
-        "ABS_DISTANCE": "motion_z",
-        "ABS_TILT_X":   "motion_x",
-        "ABS_TILT_Y":   "motion_y",
+        "ABS_THROTTLE": "ang_vel_x",
+        "ABS_RUDDER":   "ang_vel_y",
+        "ABS_WHEEL":    "ang_vel_z",
+        "ABS_DISTANCE": "lin_acc_z",
+        "ABS_TILT_X":   "lin_acc_x",
+        "ABS_TILT_Y":   "lin_acc_y",
     },
     # Axes options
     {
