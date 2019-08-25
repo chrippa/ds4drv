@@ -41,12 +41,12 @@ class DS4Report(object):
                  "button_options",
                  "button_trackpad",
                  "button_ps",
-                 "motion_y",
-                 "motion_x",
-                 "motion_z",
-                 "orientation_roll",
-                 "orientation_yaw",
-                 "orientation_pitch",
+                 "ang_vel_x",
+                 "ang_vel_y",
+                 "ang_vel_z",
+                 "lin_acc_x",
+                 "lin_acc_y",
+                 "lin_acc_z",
                  "trackpad_touch0_id",
                  "trackpad_touch0_active",
                  "trackpad_touch0_x",
@@ -181,13 +181,13 @@ class DS4Device(object):
             # Trackpad and PS buttons
             (buf[7] & 2) != 0, (buf[7] & 1) != 0,
 
-            # Acceleration
+            # Angular velocity
             S16LE.unpack_from(buf, 13)[0],
             S16LE.unpack_from(buf, 15)[0],
             S16LE.unpack_from(buf, 17)[0],
 
-            # Orientation
-            -(S16LE.unpack_from(buf, 19)[0]),
+            # Linear acceleration
+            S16LE.unpack_from(buf, 19)[0],
             S16LE.unpack_from(buf, 21)[0],
             S16LE.unpack_from(buf, 23)[0],
 
