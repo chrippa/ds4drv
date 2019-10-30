@@ -233,17 +233,17 @@ create_mapping(
 
 
 class UInputDevice(object):
-    def __init__(self, layout):
+    def __init__(self, layout, description=None, vendor=None, product=None, version=None):
         self.joystick_dev = None
         self.evdev_dev = None
         self.ignored_buttons = set()
-        self.create_device(layout)
+        self.create_device(layout, description, vendor, product, version)
 
         self._write_cache = {}
         self._scroll_details = {}
         self.emit_reset()
 
-    def create_device(self, layout):
+    def create_device(self, layout, description=None, vendor=None, product=None, version=None):
         """Creates a uinput device using the specified layout."""
         events = {ecodes.EV_ABS: [], ecodes.EV_KEY: [],
                   ecodes.EV_REL: []}
@@ -296,9 +296,14 @@ class UInputDevice(object):
                     events[ecodes.EV_REL].append(name)
                 self.mouse_rel[name] = 0.0
 
-        self.device = UInput(name=layout.name, events=events,
-                             bustype=layout.bustype, vendor=layout.vendor,
-                             product=layout.product, version=layout.version)
+        description = layout.name if description is None else description
+        vendor = layout.vendor if vendor is None else vendor
+        product = layout.product if product is None else product
+        version = layout.version if version is None else version
+
+        self.device = UInput(name=description, events=events,
+                             bustype=layout.bustype, vendor=vendor,
+                             product=product, version=version)
         self.layout = layout
 
     def write_event(self, etype, code, value):
@@ -435,14 +440,14 @@ class UInputDevice(object):
         self.device.syn()
 
 
-def create_uinput_device(mapping):
+def create_uinput_device(mapping, description=None, vendor=None, product=None, version=None):
     """Creates a uinput device."""
     if mapping not in _mappings:
         raise DeviceError("Unknown device mapping: {0}".format(mapping))
 
     try:
         mapping = _mappings[mapping]
-        device = UInputDevice(mapping)
+        device = UInputDevice(mapping, description, vendor, product, version)
     except UInputError as err:
         raise DeviceError(err)
 
