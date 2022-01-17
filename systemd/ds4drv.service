@@ -1,11 +1,12 @@
 [Unit]
 Description=ds4drv daemon
-Requires=bluetooth.service
-After=bluetooth.service
+Requires=bluetooth.target
+After=bluetooth.target
 
 [Service]
-ExecStart=/usr/bin/ds4drv
-Restart=on-abort
+Type=idle
+ExecStart=/usr/local/bin/ds4drv
+Restart=always
 
 [Install]
-WantedBy=bluetooth.target
+WantedBy=multi-user.target
