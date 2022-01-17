@@ -1,3 +1,5 @@
+# Source: https://github.com/chrippa/ds4drv/blob/master/systemd/ds4drv.service
+# Location: /etc/systemd/system/ds4drv.service
 [Unit]
 Description=ds4drv daemon
 Requires=bluetooth.target
