@@ -1,7 +1,7 @@
 import sys
 import signal
 
-from threading import Thread
+from threading import Thread, Event
 
 from .actions import ActionRegistry
 from .backends import BluetoothBackend, HidrawBackend
@@ -12,7 +12,7 @@ from .exceptions import BackendError
 
 
 class DS4Controller(object):
-    def __init__(self, index, options, dynamic=False):
+    def __init__(self, index, options, dynamic=False, disconnect_device_event=None):
         self.index = index
         self.dynamic = dynamic
         self.logger = Daemon.logger.new_module("controller {0}".format(index))
@@ -20,6 +20,7 @@ class DS4Controller(object):
         self.error = None
         self.device = None
         self.loop = EventLoop()
+        self.disconnect_device_event = disconnect_device_event
 
         self.actions = [cls(self) for cls in ActionRegistry.actions]
         self.bindings = options.parent.bindings
@@ -87,6 +88,12 @@ class DS4Controller(object):
         self.device.close()
         self.device = None
 
+        # Tell main thread one device was disconnected, maybe he can now connect another controller
+        if self.disconnect_device_event:
+            self.logger.debug("Telling main thread a device was disconnected")
+            self.disconnect_device_event.set()
+            self.disconnect_device_event.clear()
+
         if self.dynamic:
             self.loop.stop()
 
@@ -122,8 +129,9 @@ class DS4Controller(object):
             self.logger.info(*args)
 
 
-def create_controller_thread(index, controller_options, dynamic=False):
-    controller = DS4Controller(index, controller_options, dynamic=dynamic)
+def create_controller_thread(index, controller_options, dynamic=False, disconnect_device_event=None):
+    controller = DS4Controller(index, controller_options, dynamic=dynamic,
+                               disconnect_device_event=disconnect_device_event)
 
     thread = Thread(target=controller.run)
     thread.controller = controller
@@ -165,6 +173,11 @@ def main():
     else:
         backend = BluetoothBackend(Daemon.logger)
 
+    disconnect_device_event = None  # By default, no event needed if we don't limit number of simultaneous devices
+    # We want to limit the number of simultaneous connected controllers
+    if options.controller_limit and options.controller_limit > 0:
+        disconnect_device_event = Event()  # This event is used to tell the main loop that one device is disconnected
+
     try:
         backend.setup()
     except BackendError as err:
@@ -174,7 +187,7 @@ def main():
         Daemon.fork(options.daemon_log, options.daemon_pid)
 
     for index, controller_options in enumerate(options.controllers):
-        thread = create_controller_thread(index + 1, controller_options)
+        thread = create_controller_thread(index + 1, controller_options, disconnect_device_event=disconnect_device_event)
         threads.append(thread)
 
     for device in backend.devices:
@@ -201,10 +214,16 @@ def main():
         else:
             thread = create_controller_thread(len(threads) + 1,
                                               options.default_controller,
-                                              dynamic=True)
+                                              dynamic=True,
+                                              disconnect_device_event=disconnect_device_event)
             threads.append(thread)
 
         thread.controller.setup_device(device)
+        connected_devices.append(device)
+
+        if options.controller_limit and len(connected_devices) >= options.controller_limit:
+            # We have reached the defined controller limit, we now need to wait until a device is disconnected
+            disconnect_device_event.wait()
 
 if __name__ == "__main__":
     main()
