@@ -81,7 +81,7 @@ class ReportActionInput(ReportAction):
                 if joystick.device.device:
                     self.logger.info("Created devices {0} (joystick) "
                                      "{1} (evdev) ", joystick.joystick_dev,
-                                     joystick.device.device.fn)
+                                     joystick.device.device.fd)
             else:
                 joystick = None
 
