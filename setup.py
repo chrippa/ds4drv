@@ -20,7 +20,7 @@ setup(name="ds4drv",
                 "ds4drv.actions",
                 "ds4drv.backends",
                 "ds4drv.packages"],
-      install_requires=["evdev>=0.3.0", "pyudev>=0.16"],
+      install_requires=["evdev>=0.3.0,<1.9", "pyudev>=0.16"],
       classifiers=[
         "Development Status :: 4 - Beta",
         "Environment :: Console",
