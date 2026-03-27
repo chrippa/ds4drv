@@ -58,6 +58,11 @@ backendopt.add_argument("--hidraw", action="store_true",
                              "Bluetooth devices does currently not support "
                              "any LED functionality")
 
+backendopt.add_argument("--controller-limit", metavar="MAX_NUMBER_OF_CONTROLLERS",
+                        action="store",
+                        type=int,
+                        help="Maximum number of simultaneous connected controllers, default is unlimited.")
+
 daemonopt = parser.add_argument_group("daemon options")
 daemonopt.add_argument("--daemon", action="store_true",
                        help="Run in the background as a daemon")
