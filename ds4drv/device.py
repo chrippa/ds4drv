@@ -81,16 +81,24 @@ class DS4Device(object):
         self._led_flash = (0, 0)
         self._led_flashing = False
 
+        self._small_rumble = 0
+        self._big_rumble = 0
+
         self.set_operational()
 
     def _control(self, **kwargs):
         self.control(led_red=self._led[0], led_green=self._led[1],
                      led_blue=self._led[2], flash_led1=self._led_flash[0],
-                     flash_led2=self._led_flash[1], **kwargs)
+                     flash_led2=self._led_flash[1],
+                     big_rumble = self._big_rumble,
+                     small_rumble = self._small_rumble,
+                     **kwargs)
 
     def rumble(self, small=0, big=0):
         """Sets the intensity of the rumble motors. Valid range is 0-255."""
-        self._control(small_rumble=small, big_rumble=big)
+        self._big_rumble = big
+        self._small_rumble = small
+        self._control()
 
     def set_led(self, red=0, green=0, blue=0):
         """Sets the LED color. Values are RGB between 0-255."""
