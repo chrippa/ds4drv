@@ -75,7 +75,6 @@ class DS4Controller(object):
         self.logger.info("Connected to {0}", device.name)
 
         self.device = device
-        self.device.set_led(*self.options.led)
         self.fire_event("device-setup", device)
         self.loop.add_watcher(device.report_fd, self.read_report)
         self.load_options(self.options)

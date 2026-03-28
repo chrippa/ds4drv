@@ -160,10 +160,13 @@ controllopt.add_argument("--next-controller", nargs=0, action=ControllerAction,
 def hexcolor(color):
     color = color.strip("#")
 
-    if len(color) != 6:
+    if len(color) == 6:
+        values = (color[:2], color[2:4], color[4:6])
+    elif len(color) == 3:
+        values = (color[:1]*2, color[1:2]*2, color[2:3]*2)
+    else:
         raise ValueError
 
-    values = (color[:2], color[2:4], color[4:6])
     values = map(lambda x: int(x, 16), values)
 
     return tuple(values)
