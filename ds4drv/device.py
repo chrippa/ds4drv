@@ -1,3 +1,4 @@
+from binascii import crc32
 from struct import Struct
 from sys import version_info as sys_version
 
@@ -118,17 +119,21 @@ class DS4Device(object):
                 led_red=0, led_green=0, led_blue=0,
                 flash_led1=0, flash_led2=0):
         if self.type == "bluetooth":
-            pkt = bytearray(77)
-            pkt[0] = 128
-            pkt[2] = 255
-            offset = 2
+            pkt = bytearray(79)
+            pkt[:5] = [0xa2, 0x11, 0x80, 0x00, 0xff]
+            offset = 4
             report_id = 0x11
+            send_from = 2
 
         elif self.type == "usb":
             pkt = bytearray(31)
             pkt[0] = 255
             offset = 0
             report_id = 0x05
+            send_from = 0
+
+        else:
+            raise ValueError("Type is neither bluetooth nor usb")
 
         # Rumble
         pkt[offset+3] = min(small_rumble, 255)
@@ -145,7 +150,14 @@ class DS4Device(object):
         # Time to flash dark (255 = 2.5 seconds)
         pkt[offset+9] = min(flash_led2, 255)
 
-        self.write_report(report_id, pkt)
+        # Last 4 bytes are CRC32
+        crc = crc32(pkt[:-4])
+        pkt[-4] = (crc & 0x000000ff)
+        pkt[-3] = (crc & 0x0000ff00) >> 8
+        pkt[-2] = (crc & 0x00ff0000) >> 16
+        pkt[-1] = (crc & 0xff000000) >> 24
+
+        self.write_report(report_id, pkt[send_from:])
 
     def parse_report(self, buf):
         """Parse a buffer containing a HID report."""
