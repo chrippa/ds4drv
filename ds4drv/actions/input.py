@@ -1,5 +1,6 @@
 from ..action import ReportAction
 from ..config import buttoncombo
+from ..config import axescombo
 from ..exceptions import DeviceError
 from ..uinput import create_uinput_device
 
@@ -18,6 +19,10 @@ ReportAction.add_option("--ignored-buttons", metavar="button(s)",
                              "as joystick events. For example specify 'PS' to "
                              "disable Steam's big picture mode shortcut when "
                              "using the --emulate-* options")
+ReportAction.add_option("--ignored-axes", metavar="button(s)",
+                        type=axescombo(","), default=[],
+                        help="A comma-separated list of Axes to never send "
+                             "as joystick events.")
 ReportAction.add_option("--mapping", metavar="mapping",
                         help="Use a custom button mapping specified in the "
                              "config file")
@@ -88,6 +93,10 @@ class ReportActionInput(ReportAction):
             self.joystick.ignored_buttons = set()
             for button in options.ignored_buttons:
                 self.joystick.ignored_buttons.add(button)
+
+            self.joystick.ignored_axes = set()
+            for axes in options.ignored_axes:
+                self.joystick.ignored_axes.add(axes)
 
             if joystick:
                 self.joystick_layout = joystick_layout

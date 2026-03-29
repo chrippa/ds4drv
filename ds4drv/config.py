@@ -14,6 +14,7 @@ from operator import attrgetter
 from . import __version__
 from .uinput import parse_uinput_mapping
 from .utils import parse_button_combo
+from .utils import parse_axes_combo
 
 
 CONFIG_FILES = ("~/.config/ds4drv.conf", "/etc/ds4drv.conf")
@@ -175,6 +176,12 @@ def stringlist(s):
 
 def buttoncombo(sep):
     func = partial(parse_button_combo, sep=sep)
+    func.__name__ = "button combo"
+    return func
+
+
+def axescombo(sep):
+    func = partial(parse_axes_combo, sep=sep)
     func.__name__ = "button combo"
     return func
 

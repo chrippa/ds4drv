@@ -37,6 +37,17 @@ def parse_button_combo(combo, sep="+"):
 
     return tuple(map(button_prefix, combo.lower().split(sep)))
 
+def parse_axes_combo(combo, sep="+"):
+    def button_prefix(button):
+        button = button.strip()
+
+        if button not in VALID_BUTTONS:
+            raise ValueError("Invalid Input: {0}".format(button))
+
+        return button
+
+    return tuple(map(button_prefix, combo.lower().split(sep)))
+
 
 def with_metaclass(meta, base=object):
     """Create a base class with a metaclass."""
