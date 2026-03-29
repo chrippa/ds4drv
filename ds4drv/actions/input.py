@@ -23,6 +23,11 @@ ReportAction.add_option("--mapping", metavar="mapping",
                              "config file")
 ReportAction.add_option("--trackpad-mouse", action="store_true",
                         help="Makes the trackpad control the mouse")
+ReportAction.add_option("--vdev-name", metavar="name",
+                        help="Override the virtual device name")
+ReportAction.add_option("--vdev-ids", metavar="[vid]:[pid]:[vers]",
+                        help="Override the virtual device vendor, product "
+                             "and/or version IDs (in hex)")
 
 
 class ReportActionInput(ReportAction):
@@ -71,12 +76,23 @@ class ReportActionInput(ReportAction):
                 self.mouse.device.close()
                 self.mouse = None
 
+            vdev_ids = ((options.vdev_ids or "") + "::").split(":",3)
+            vendor = int(vdev_ids[0], 16) if vdev_ids[0] else None
+            product = int(vdev_ids[1], 16) if vdev_ids[1] else None
+            version = int(vdev_ids[2], 16) if vdev_ids[2] else None
+
             if self.joystick and self.joystick_layout != joystick_layout:
                 self.joystick.device.close()
-                joystick = create_uinput_device(joystick_layout)
+                joystick = create_uinput_device(joystick_layout,
+                                                options.vdev_name,
+                                                vendor, product,
+                                                version)
                 self.joystick = joystick
             elif not self.joystick:
-                joystick = create_uinput_device(joystick_layout)
+                joystick = create_uinput_device(joystick_layout,
+                                                options.vdev_name,
+                                                vendor, product,
+                                                version)
                 self.joystick = joystick
                 if joystick.device.device:
                     self.logger.info("Created devices {0} (joystick) "
