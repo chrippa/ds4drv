@@ -3,7 +3,7 @@ import subprocess
 
 from ..backend import Backend
 from ..exceptions import BackendError, DeviceError
-from ..device import DS4Device
+from ..device import DS4Device, DSenseDevice
 from ..utils import zero_copy_slice
 
 
@@ -15,6 +15,9 @@ HIDP_DATA_RTYPE_OUTPUT  = 0x02
 
 REPORT_ID = 0x11
 REPORT_SIZE = 79
+
+DSENSE_REPORT_ID = 0x31
+DSENSE_REPORT_SIZE = 79
 
 
 class BluetoothDS4Device(DS4Device):
@@ -78,7 +81,6 @@ class BluetoothDS4Device(DS4Device):
     def close(self):
         self.int_sock.close()
         self.ctl_sock.close()
-
 
 class BluetoothBackend(Backend):
     __name__ = "bluetooth"

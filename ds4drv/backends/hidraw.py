@@ -10,7 +10,7 @@ from pyudev import Context, Monitor
 
 from ..backend import Backend
 from ..exceptions import DeviceError
-from ..device import DS4Device
+from ..device import DS4Device, DSenseDevice
 from ..utils import zero_copy_slice
 
 
@@ -102,11 +102,97 @@ class HidrawUSBDS4Device(HidrawDS4Device):
         self.device_name = "{0} {1}".format(addr, self.device_name)
         self.device_addr = addr
 
+class HidrawDSenseDevice(DSenseDevice):
+    def __init__(self, name, addr, type, hidraw_device, event_device):
+        try:
+            self.report_fd = os.open(hidraw_device, os.O_RDWR | os.O_NONBLOCK)
+            self.fd = FileIO(self.report_fd, "rb+", closefd=False)
+            self.input_device = InputDevice(event_device)
+            self.input_device.grab()
+        except (OSError, IOError) as err:
+            raise DeviceError(err)
+
+        self.buf = bytearray(self.report_size)
+
+        super(HidrawDSenseDevice, self).__init__(name, addr, type)
+
+    def read_report(self):
+        try:
+            ret = self.fd.readinto(self.buf)
+        except IOError:
+            return
+
+        # Disconnection
+        if ret == 0:
+            return
+
+        # Invalid report size or id, just ignore it
+        if ret < self.report_size or self.buf[0] != self.valid_report_id:
+            return False
+
+        if self.type == "bluetooth":
+            # Cut off bluetooth data
+            buf = zero_copy_slice(self.buf, 1)
+        else:
+            buf = self.buf
+
+        return self.parse_report(buf)
+
+    def read_feature_report(self, report_id, size):
+        op = HIDIOCGFEATURE(size + 1)
+        buf = bytearray(size + 1)
+        buf[0] = report_id
+
+        return fcntl.ioctl(self.fd, op, bytes(buf))
+
+    def write_report(self, report_id, data):
+        hid = bytearray((report_id,))
+        self.fd.write(hid + data)
+
+    def close(self):
+        try:
+            # Reset LED to original hidraw pairing colour.
+            self.set_led(0, 0, 1)
+
+            self.fd.close()
+            self.input_device.ungrab()
+        except IOError:
+            pass
+
+
+class HidrawBluetoothDSenseDevice(HidrawDSenseDevice):
+    __type__ = "bluetooth"
+
+    report_size = 78
+    valid_report_id = 0x31
+
+    def set_operational(self):
+        self.read_feature_report(0x05, 41)
+
+
+class HidrawUSBDSenseDevice(HidrawDSenseDevice):
+    __type__ = "usb"
+
+    report_size = 64
+    valid_report_id = 0x01
+
+    def set_operational(self):
+        # Get the bluetooth MAC
+        addr = self.read_feature_report(0x81, 6)[1:]
+        addr = ["{0:02x}".format(c) for c in bytearray(addr)]
+        addr = ":".join(reversed(addr)).upper()
+
+        self.device_name = "{0} {1}".format(addr, self.device_name)
+        self.device_addr = addr
+
 
 HID_DEVICES = {
     "Sony Interactive Entertainment Wireless Controller": HidrawUSBDS4Device,
     "Sony Computer Entertainment Wireless Controller": HidrawUSBDS4Device,
     "Wireless Controller": HidrawBluetoothDS4Device,
+    "Sony Interactive Entertainment DualSense Wireless Controller": HidrawUSBDSenseDevice,
+    "Sony Computer Entertainment DualSense Wireless Controller": HidrawUSBDSenseDevice,
+    "DualSense Wireless Controller": HidrawBluetoothDSenseDevice,
 }
 
 

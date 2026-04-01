@@ -1,7 +1,6 @@
 from struct import Struct
 from sys import version_info as sys_version
 
-
 class StructHack(Struct):
     """Python <2.7.4 doesn't support struct unpack from bytearray."""
     def unpack_from(self, buf, offset=0):
@@ -41,12 +40,12 @@ class DS4Report(object):
                  "button_options",
                  "button_trackpad",
                  "button_ps",
-                 "motion_y",
                  "motion_x",
+                 "motion_y",
                  "motion_z",
                  "orientation_roll",
-                 "orientation_yaw",
                  "orientation_pitch",
+                 "orientation_yaw",
                  "trackpad_touch0_id",
                  "trackpad_touch0_active",
                  "trackpad_touch0_x",
@@ -182,14 +181,14 @@ class DS4Device(object):
             (buf[7] & 2) != 0, (buf[7] & 1) != 0,
 
             # Acceleration
+            S16LE.unpack_from(buf, 19)[0],
+            S16LE.unpack_from(buf, 21)[0],
+            S16LE.unpack_from(buf, 23)[0],
+            
+            # Orientation
             S16LE.unpack_from(buf, 13)[0],
             S16LE.unpack_from(buf, 15)[0],
             S16LE.unpack_from(buf, 17)[0],
-
-            # Orientation
-            -(S16LE.unpack_from(buf, 19)[0]),
-            S16LE.unpack_from(buf, 21)[0],
-            S16LE.unpack_from(buf, 23)[0],
 
             # Trackpad touch 1: id, active, x, y
             buf[35] & 0x7f, (buf[35] >> 7) == 0,
@@ -208,6 +207,147 @@ class DS4Device(object):
             # External inputs (usb, audio, mic)
             (buf[30] & 16) != 0, (buf[30] & 32) != 0,
             (buf[30] & 64) != 0
+        )
+
+    def read_report(self):
+        """Read and parse a HID report."""
+        pass
+
+    def write_report(self, report_id, data):
+        """Writes a HID report to the control channel."""
+        pass
+
+    def set_operational(self):
+        """Tells the DS4 controller we want full HID reports."""
+        pass
+
+    def close(self):
+        """Disconnects from the device."""
+        pass
+
+    @property
+    def name(self):
+        if self.type == "bluetooth":
+            type_name = "Bluetooth"
+        elif self.type == "usb":
+            type_name = "USB"
+
+        return "{0} Controller ({1})".format(type_name, self.device_name)
+
+class DSenseDevice(object):
+    """A DSense controller object.
+
+    Used to control the device functions and reading HID reports.
+    """
+
+    def __init__(self, device_name, device_addr, type):
+        self.device_name = device_name
+        self.device_addr = device_addr
+        self.type = type
+
+        self._led = (0, 0, 0)
+        self._led_flash = (0, 0)
+        self._led_flashing = False
+
+        self.set_operational()
+
+    def _control(self, **kwargs):
+        self.control(led_red=self._led[0], led_green=self._led[1],
+                     led_blue=self._led[2], flash_led1=self._led_flash[0],
+                     flash_led2=self._led_flash[1], **kwargs)
+
+    def rumble(self, small=0, big=0):
+        """Sets the intensity of the rumble motors. Valid range is 0-255."""
+        self._control(small_rumble=small, big_rumble=big)
+
+    def set_led(self, red=0, green=0, blue=0):
+        """Sets the LED color. Values are RGB between 0-255."""
+        self._led = (red, green, blue)
+        self._control()
+
+    def start_led_flash(self, on, off):
+        """Starts flashing the LED."""
+        if not self._led_flashing:
+            self._led_flash = (on, off)
+            self._led_flashing = True
+            self._control()
+
+    def stop_led_flash(self):
+        """Stops flashing the LED."""
+        if self._led_flashing:
+            self._led_flash = (0, 0)
+            self._led_flashing = False
+            # Call twice, once to stop flashing...
+            self._control()
+            # ...and once more to make sure the LED is on.
+            self._control()
+
+    def control(self, big_rumble=0, small_rumble=0,
+                led_red=0, led_green=0, led_blue=0,
+                flash_led1=0, flash_led2=0):
+        pass # not implemented
+
+    def parse_report(self, buf):
+        """Parse a buffer containing a HID report."""
+        dpad = buf[8] % 16
+
+        return DS4Report(
+            # Left analog stick
+            buf[1], buf[2],
+
+            # Right analog stick
+            buf[3], buf[4],
+
+            # L2 and R2 analog
+            buf[5], buf[6],
+
+            # DPad up, down, left, right
+            (dpad in (0, 1, 7)), (dpad in (3, 4, 5)),
+            (dpad in (5, 6, 7)), (dpad in (1, 2, 3)),
+
+            # Buttons cross, circle, square, triangle
+            (buf[8] & 32) != 0, (buf[8] & 64) != 0,
+            (buf[8] & 16) != 0, (buf[8] & 128) != 0,
+
+            # L1, L2 and L3 buttons
+            (buf[9] & 1) != 0, (buf[9] & 4) != 0, (buf[9] & 64) != 0,
+
+            # R1, R2,and R3 buttons
+            (buf[9] & 2) != 0, (buf[9] & 8) != 0, (buf[9] & 128) != 0,
+
+            # Share and option buttons
+            (buf[9] & 16) != 0, (buf[9] & 32) != 0,
+
+            # Trackpad and PS buttons
+            (buf[10] & 2) != 0, (buf[10] & 1) != 0,
+
+            # Linear acceleration
+            S16LE.unpack_from(buf, 22)[0],
+            S16LE.unpack_from(buf, 24)[0],
+            S16LE.unpack_from(buf, 26)[0],
+            
+            # Angular velocity
+            S16LE.unpack_from(buf, 16)[0],
+            S16LE.unpack_from(buf, 18)[0],
+            S16LE.unpack_from(buf, 20)[0],
+
+            # Trackpad touch 1: id, active, x, y
+            buf[33] & 0x7f, (buf[33] >> 7) == 0,
+            ((buf[35] & 0x0f) << 8) | buf[34],
+            buf[36] << 4 | ((buf[35] & 0xf0) >> 4),
+
+            # Trackpad touch 2: id, active, x, y
+            buf[37] & 0x7f, (buf[37] >> 7) == 0,
+            ((buf[39] & 0x0f) << 8) | buf[38],
+            buf[40] << 4 | ((buf[39] & 0xf0) >> 4),
+
+            # Timestamp and battery
+            buf[7],
+            buf[53] % 16,
+
+            # External inputs (usb, audio, mic)
+            0, 0, #(buf[30] & 16) != 0, (buf[30] & 32) != 0,
+            0 #(buf[30] & 64) != 0
         )
 
     def read_report(self):
