@@ -61,7 +61,7 @@ class ReportActionBinding(ReportAction):
             self.add_binding(self.controller.default_profile.profile_toggle,
                              lambda r: self.controller.next_profile())
 
-    def handle_binding_action(self, report, action):
+    def handle_binding_action(self, report, actions_raw):
         info = dict(name=self.controller.device.name,
                     profile=self.controller.current_profile,
                     device_addr=self.controller.device.device_addr,
@@ -74,20 +74,21 @@ class ReportActionBinding(ReportAction):
                 var = getattr(var, attr, None)
             return str(var)
 
-        action = re.sub(r"\$(?P<var>\w+)(\.(?P<attr>\w+))?",
-                        replace_var, action)
-        action_split = shlex.split(action)
-        action_type = action_split[0]
-        action_args = action_split[1:]
+        actions = re.sub(r"\$(?P<var>\w+)(\.(?P<attr>\w+))?",
+                        replace_var, actions_raw).split(";")
+        for sub_action in actions:
+            action_split = shlex.split(sub_action)
+            action_type = action_split[0]
+            action_args = action_split[1:]
 
-        func = self.actions.get(action_type)
-        if func:
-            try:
-                func(self.controller, *action_args)
-            except Exception as err:
-                self.logger.error("Failed to execute action: {0}", err)
-        else:
-            self.logger.error("Invalid action type: {0}", action_type)
+            func = self.actions.get(action_type)
+            if func:
+                try:
+                    func(self.controller, *action_args)
+                except Exception as err:
+                    self.logger.error("Failed to execute action: {0}", err)
+            else:
+                self.logger.error("Invalid action type: {0}", action_type)
 
     def handle_report(self, report):
         for binding in self.bindings:
