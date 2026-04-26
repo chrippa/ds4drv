@@ -25,7 +25,15 @@ class HidrawDS4Device(DS4Device):
             self.report_fd = os.open(hidraw_device, os.O_RDWR | os.O_NONBLOCK)
             self.fd = FileIO(self.report_fd, "rb+", closefd=False)
             self.input_device = InputDevice(event_device)
-            self.input_device.grab()
+
+            # Try to grab the program, but don't kill it if it fails.
+            try:
+                self.input_device.grab()
+            except (OSError, IOError):
+                # If it says 'Busy', we ignore it and continue.
+                # This allows ds4drv to function even if the kernel does not release the node.
+                pass
+
         except (OSError, IOError) as err:
             raise DeviceError(err)
 
@@ -94,13 +102,20 @@ class HidrawUSBDS4Device(HidrawDS4Device):
     valid_report_id = 0x01
 
     def set_operational(self):
-        # Get the bluetooth MAC
-        addr = self.read_feature_report(0x81, 6)[1:]
-        addr = ["{0:02x}".format(c) for c in bytearray(addr)]
-        addr = ":".join(reversed(addr)).upper()
+        # Attempts to obtain the MAC address via Bluetooth.
+        # In modern kernels, this may cause a BrokenPipeError (Errno 32)
+        # if the native driver (hid-sony/hid-playstation) is active.
+        try:
+            addr = self.read_feature_report(0x81, 6)[1:]
+            addr = ["{0:02x}".format(c) for c in bytearray(addr)]
+            addr = ":".join(reversed(addr)).upper()
 
-        self.device_name = "{0} {1}".format(addr, self.device_name)
-        self.device_addr = addr
+            self.device_name = "{0} {1}".format(addr, self.device_name)
+            self.device_addr = addr
+        except (BrokenPipeError, OSError, IOError) as err:
+            # It just warns and continues, allowing the control to function
+            # even if it cannot read the actual MAC address.
+            print(f"[warning] Could not read Bluetooth address via hidraw: {err}")
 
 
 HID_DEVICES = {
