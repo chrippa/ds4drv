@@ -1,17 +1,23 @@
 import socket
-import subprocess
+import dbus
+import time
 
 from ..backend import Backend
 from ..exceptions import BackendError, DeviceError
 from ..device import DS4Device
 from ..utils import zero_copy_slice
 
+BLUEZ_SERVICE = "org.bluez"
+DBUS_OM = "org.freedesktop.DBus.ObjectManager"
+ADAPTER_IFACE = "org.bluez.Adapter1"
+DEVICE_IFACE = "org.bluez.Device1"
+PROPERTIES_IFACE = "org.freedesktop.DBus.Properties"
 
 L2CAP_PSM_HIDP_CTRL = 0x11
 L2CAP_PSM_HIDP_INTR = 0x13
 
 HIDP_TRANS_SET_REPORT = 0x50
-HIDP_DATA_RTYPE_OUTPUT  = 0x02
+HIDP_DATA_RTYPE_OUTPUT = 0x02
 
 REPORT_ID = 0x11
 REPORT_SIZE = 79
@@ -20,20 +26,22 @@ REPORT_SIZE = 79
 class BluetoothDS4Device(DS4Device):
     @classmethod
     def connect(cls, addr):
-        ctl_socket = socket.socket(socket.AF_BLUETOOTH, socket.SOCK_SEQPACKET,
-                                   socket.BTPROTO_L2CAP)
+            ctl = socket.socket(
+                socket.AF_BLUETOOTH, socket.SOCK_SEQPACKET, socket.BTPROTO_L2CAP
+            )
 
-        int_socket = socket.socket(socket.AF_BLUETOOTH, socket.SOCK_SEQPACKET,
-                                   socket.BTPROTO_L2CAP)
+            intr = socket.socket(
+                socket.AF_BLUETOOTH, socket.SOCK_SEQPACKET, socket.BTPROTO_L2CAP
+            )
 
-        try:
-            ctl_socket.connect((addr, L2CAP_PSM_HIDP_CTRL))
-            int_socket.connect((addr, L2CAP_PSM_HIDP_INTR))
-            int_socket.setblocking(False)
-        except socket.error as err:
-            DeviceError("Failed to connect: {0}".format(err))
+            ctl.connect((addr, L2CAP_PSM_HIDP_CTRL))
+            intr.connect((addr, L2CAP_PSM_HIDP_INTR))
+            intr.setblocking(False)
 
-        return cls(addr, ctl_socket, int_socket)
+            return cls(addr, ctl, intr)
+
+        except socket.error as e:
+            raise DeviceError(f"Failed to connect: {e}")
 
     def __init__(self, addr, ctl_sock, int_sock):
         self.buf = bytearray(REPORT_SIZE)
@@ -41,8 +49,7 @@ class BluetoothDS4Device(DS4Device):
         self.int_sock = int_sock
         self.report_fd = int_sock.fileno()
 
-        super(BluetoothDS4Device, self).__init__(addr.upper(), addr,
-                                                 "bluetooth")
+        super().__init__(addr.upper(), addr, "bluetooth")
 
     def read_report(self):
         try:
@@ -64,8 +71,7 @@ class BluetoothDS4Device(DS4Device):
         return self.parse_report(buf)
 
     def write_report(self, report_id, data):
-        hid = bytearray((HIDP_TRANS_SET_REPORT | HIDP_DATA_RTYPE_OUTPUT,
-                         report_id))
+        hid = bytearray((HIDP_TRANS_SET_REPORT | HIDP_DATA_RTYPE_OUTPUT, report_id))
 
         self.ctl_sock.sendall(hid + data)
 
@@ -73,7 +79,7 @@ class BluetoothDS4Device(DS4Device):
         try:
             self.set_led(255, 255, 255)
         except socket.error as err:
-            raise DeviceError("Failed to set operational mode: {0}".format(err))
+            raise DeviceError(f"Failed to set operational mode: {err}")
 
     def close(self):
         self.int_sock.close()
@@ -83,63 +89,154 @@ class BluetoothDS4Device(DS4Device):
 class BluetoothBackend(Backend):
     __name__ = "bluetooth"
 
-    def setup(self):
+    def __init__(self, logger):
+        super().__init__(logger)
+        self.connected = set()
+
+    # ---------------------------
+    # DBUS helpers
+    # ---------------------------
+
+    def _bus(self):
+        return dbus.SystemBus()
+
+    def _om(self):
+        bus = self._bus()
+        obj = bus.get_object(BLUEZ_SERVICE, "/")
+        return dbus.Interface(obj, DBUS_OM)
+
+    def _get_adapter_path(self):
+        om = self._om()
+        objects = om.GetManagedObjects()
+
+        adapters = []
+
+        for path, ifaces in objects.items():
+            if ADAPTER_IFACE in ifaces:
+                adapters.append(path)
+
+        if not adapters:
+            raise BackendError("No Bluetooth adapter found")
+
+        return adapters[0]
+
+    def _props(self, path):
+        bus = self._bus()
+        obj = bus.get_object(BLUEZ_SERVICE, path)
+        return dbus.Interface(obj, dbus.PROPERTIES_IFACE)
+
+    # ---------------------------
+    # setup
+    # ---------------------------
+
+     def setup(self):
         """Check if the bluetooth controller is available."""
-        try:
-            subprocess.check_output(["hcitool", "clock"],
-                                    stderr=subprocess.STDOUT)
-        except subprocess.CalledProcessError:
-            raise BackendError("'hcitool clock' returned error. Make sure "
-                               "your bluetooth device is powered up with "
-                               "'hciconfig hciX up'.")
-        except OSError:
-            raise BackendError("'hcitool' could not be found, make sure you "
-                               "have bluez-utils installed.")
+         try:
+            path = self._get_adapter_path()
+            props = self._props(path)
+
+            powered = props.Get(ADAPTER_IFACE, "Powered")
+
+            if not powered:
+                raise BackendError("Bluetooth adapter is powered off")
+
+        except Exception as e:
+            raise BackendError(f"Bluetooth setup failed: {e}")
+
+    # ---------------------------
+    # scan
+    # ---------------------------
 
     def scan(self):
         """Scan for bluetooth devices."""
+        bus = self._bus()
+        om = self._om()
+
+        adapter_path = self._get_adapter_path()
+        adapter = dbus.Interface(
+            bus.get_object(BLUEZ_SERVICE, adapter_path), ADAPTER_IFACE
+        )
+
         try:
-            res = subprocess.check_output(["hcitool", "scan", "--flush"],
-                                          stderr=subprocess.STDOUT)
-        except subprocess.CalledProcessError:
-             raise BackendError("'hcitool scan' returned error. Make sure "
-                                "your bluetooth device is powered up with "
-                                "'hciconfig hciX up'.")
+            adapter.StartDiscovery()
+            time.sleep(3)
+            adapter.StopDiscovery()
+        except Exception:
+            pass
 
         devices = []
-        res = res.splitlines()[1:]
-        for _, bdaddr, name in map(lambda l: l.split(b"\t"), res):
-            devices.append((bdaddr.decode("utf8"), name.decode("utf8")))
+        objects = om.GetManagedObjects()
 
-        return devices
+        for _, ifaces in objects.items():
+            dev = ifaces.get(DEVICE_IFACE)
+            if not dev:
+                continue
+
+            addr = dev.get("Address")
+            name = dev.get("Alias") or dev.get("Name") or ""
+
+            if addr:
+                devices.append((str(addr), str(name)))
+
+         return devices
+
+    # ---------------------------
+    # device discovery
+    # ---------------------------
 
     def find_device(self):
         """Scan for bluetooth devices and return a DS4 device if found."""
-        for bdaddr, name in self.scan():
-            if name == "Wireless Controller":
-                self.logger.info("Found device {0}", bdaddr)
-                return BluetoothDS4Device.connect(bdaddr)
+        for addr, name in self.scan():
+            name_u = (name or "").upper()
+
+            if (
+                "WIRELESS CONTROLLER" in name_u
+                or "DUALSHOCK" in name_u
+                or "DUALSENSE" in name_u
+            ):
+                if addr in self.connected:
+                    continue
+
+                self.logger.info(f"Found DS controller: {addr}")
+
+                try:
+                    dev = BluetoothDS4Device.connect(addr)
+                    self.connected.add(addr)
+                    return dev
+                except Exception as e:
+                    self.logger.error(f"Failed to connect {addr}: {e}")
+                    continue
+
+        return None
+
+    # ---------------------------
+    # main loop
+    # ---------------------------
 
     @property
     def devices(self):
         """Wait for new DS4 devices to appear."""
         log_msg = True
-        while True:
-            if log_msg:
-                self.logger.info("Scanning for devices")
 
+        while True:
             try:
-                device = self.find_device()
-                if device:
-                    yield device
+                if log_msg:
+                    self.logger.info("Scanning for DS4 devices (BlueZ DBus)")
+
+                dev = self.find_device()
+
+                if dev:
+                    yield dev
                     log_msg = True
                 else:
                     log_msg = False
-            except BackendError as err:
-                self.logger.error("Error while scanning for devices: {0}",
-                                  err)
+
+                time.sleep(2)
+
+            except BackendError as e:
+                self.logger.error(str(e))
                 return
-            except DeviceError as err:
-                self.logger.error("Unable to connect to detected device: {0}",
-                                  err)
+            except DeviceError as e:
+                self.connected.clear()
+                self.logger.error(str(e))
 
